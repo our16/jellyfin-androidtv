@@ -6,6 +6,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.compose.ui.Modifier
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -28,6 +29,7 @@ import org.jellyfin.androidtv.ui.composable.compat.AppNavigationHost
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.screensaver.InAppScreensaver
 import org.jellyfin.androidtv.ui.settings.compat.MainActivitySettings
+import org.jellyfin.androidtv.ui.plugin.UiPlugin
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.applyTheme
 import org.koin.android.ext.android.inject
@@ -40,6 +42,7 @@ class MainActivity : FragmentActivity() {
 	private val userRepository by inject<UserRepository>()
 	private val interactionTrackerViewModel by viewModel<InteractionTrackerViewModel>()
 	private val workManager by inject<WorkManager>()
+	private val uiPlugin by inject<UiPlugin>()
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		applyTheme()
@@ -63,13 +66,14 @@ class MainActivity : FragmentActivity() {
 			}.launchIn(lifecycleScope)
 
 		setContent {
-			JellyfinTheme {
+			uiPlugin.Theme {
 				ProvideLocalInteractionTracker(
 					interactionTracker = { interactionTrackerViewModel.notifyInteraction(false, userInitiated = true) }
 				) {
 					AppBackground()
-					AppNavigationHost(
+					uiPlugin.AppNavHost(
 						navigationRepository = navigationRepository,
+						modifier = Modifier
 					)
 					InAppScreensaver()
 					MainActivitySettings()

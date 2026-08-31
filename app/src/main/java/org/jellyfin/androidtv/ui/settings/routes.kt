@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.ui.settings.screen.customization.SettingsCustomiza
 import org.jellyfin.androidtv.ui.settings.screen.customization.SettingsCustomizationScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.SettingsCustomizationThemeScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.SettingsCustomizationWatchedIndicatorScreen
+import org.jellyfin.androidtv.ui.settings.screen.customization.SettingsUiPluginScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitleTextStrokeColorScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitlesBackgroundColorScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitlesScreen
@@ -108,6 +109,7 @@ object Routes {
 	const val ABOUT = "/about"
 	const val LICENSES = "/licenses"
 	const val LICENSE = "/license/{artifactId}"
+	const val CUSTOMIZATION_UI_PLUGIN = "/customization/ui-plugin"
 }
 
 val routes = mapOf<String, RouteComposable>(
@@ -172,6 +174,9 @@ val routes = mapOf<String, RouteComposable>(
 	},
 	Routes.CUSTOMIZATION_SUBTITLES_EDGE_COLOR to {
 		SettingsSubtitleTextStrokeColorScreen()
+	},
+	Routes.CUSTOMIZATION_UI_PLUGIN to {
+		SettingsUiPluginScreen()
 	},
 	Routes.LIBRARIES to {
 		SettingsLibrariesScreen()

@@ -19,6 +19,7 @@ import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
 import org.koin.compose.koinInject
+import org.koin.compose.koinInject
 
 @Composable
 fun SettingsCustomizationScreen() {
@@ -106,6 +107,15 @@ fun SettingsCustomizationScreen() {
 				headingContent = { Text(stringResource(R.string.home_prefs)) },
 				onClick = { router.push(Routes.HOME) },
 				modifier = Modifier.focusKey(Routes.HOME)
+			)
+		}
+
+		item {
+			ListButton(
+				headingContent = { Text("界面风格") },
+				captionContent = { Text("切换 UI 插件") },
+				onClick = { router.push(Routes.CUSTOMIZATION_UI_PLUGIN) },
+				modifier = Modifier.focusKey(Routes.CUSTOMIZATION_UI_PLUGIN)
 			)
 		}
 	}

@@ -73,6 +73,12 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.jellyfin.sdk.Jellyfin as JellyfinSdk
+import org.jellyfin.androidtv.ui.plugin.UiPlugin
+import org.jellyfin.androidtv.ui.plugin.UiPluginPreferences
+import org.jellyfin.androidtv.ui.plugin.UiPluginPreferencesImpl
+import org.jellyfin.androidtv.ui.plugin.UiPluginRegistry
+import org.jellyfin.androidtv.ui.plugin.DefaultUiPlugin
+import org.jellyfin.androidtv.ui.plugin.BilibiliStyleUiPlugin
 
 val defaultDeviceInfo = named("defaultDeviceInfo")
 
@@ -178,4 +184,15 @@ val appModule = module {
 	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
 
 	factory { (context: Context) -> SearchFragmentDelegate(context, get(), get()) }
+
+	// UI Plugin system
+	single<UiPluginPreferences> { UiPluginPreferencesImpl(androidContext()) }
+	single<UiPlugin> {
+		val prefs = get<UiPluginPreferences>()
+		val pluginId = prefs.getActivePluginId()
+		when (pluginId) {
+			"bilibili" -> BilibiliStyleUiPlugin()
+			else -> DefaultUiPlugin()
+		}
+	}
 }
