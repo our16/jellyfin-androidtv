@@ -131,8 +131,30 @@ class MainActivity : FragmentActivity() {
 	private fun onKeyEvent(keyCode: Int, event: KeyEvent?): Boolean = supportFragmentManager.fragments
 		.any { it.onKeyEvent(keyCode, event) }
 
-	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)
+	// D-pad debounce: prevent rapid key events from causing focus skip on projectors
+	private var lastDpadKeyEventTime = 0L
+	private val dpadDebounceIntervalMs = 50L // 50ms debounce for D-pad navigation
+
+	private fun isDpadKey(keyCode: Int): Boolean {
+		return keyCode in listOf(
+			KeyEvent.KEYCODE_DPAD_UP,
+			KeyEvent.KEYCODE_DPAD_DOWN,
+			KeyEvent.KEYCODE_DPAD_LEFT,
+			KeyEvent.KEYCODE_DPAD_RIGHT,
+		)
+	}
+
+	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+		// Apply debounce for D-pad navigation keys only
+		if (isDpadKey(keyCode)) {
+			val now = android.os.SystemClock.uptimeMillis()
+			if (now - lastDpadKeyEventTime < dpadDebounceIntervalMs) {
+				return true // Consume the event (debounced)
+			}
+			lastDpadKeyEventTime = now
+		}
+		return onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)
+	}
 
 	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean =
 		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)

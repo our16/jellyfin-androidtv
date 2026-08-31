@@ -41,4 +41,17 @@ enum class BufferLength(
 		bufferForPlaybackDuration = 5.seconds,
 		bufferForPlaybackAfterRebufferDuration = 10.seconds,
 	),
+
+	/**
+	 * Large buffer optimized for 4K content on devices with sufficient RAM (4GB+).
+	 * Prevents stuttering during high-bitrate 4K HEVC playback.
+	 */
+	@Suppress("MagicNumber")
+	LARGE_4K(
+		nameRes = R.string.playback_buffer_large_4k,
+		minBufferDuration = 60.seconds,
+		maxBufferDuration = 180.seconds,
+		bufferForPlaybackDuration = 3.seconds,
+		bufferForPlaybackAfterRebufferDuration = 6.seconds,
+	),
 }

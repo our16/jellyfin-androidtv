@@ -98,8 +98,9 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 
 		/**
 		 * Change refresh rate to match media when device supports it
+		 * Default: SCALE_ON_TV - optimized for projectors like XGIMI H6
 		 */
-		var refreshRateSwitchingBehavior = enumPreference("refresh_rate_switching_behavior", RefreshRateSwitchingBehavior.DISABLED)
+		var refreshRateSwitchingBehavior = enumPreference("refresh_rate_switching_behavior", RefreshRateSwitchingBehavior.SCALE_ON_TV)
 
 		/**
 		 * Whether ExoPlayer should prefer FFmpeg renderers to core ones.

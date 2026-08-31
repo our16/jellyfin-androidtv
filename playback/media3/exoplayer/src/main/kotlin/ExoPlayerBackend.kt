@@ -59,6 +59,14 @@ class ExoPlayerBackend(
 		const val TS_SEARCH_BYTES_LM = TsExtractor.TS_PACKET_SIZE * 1800
 		const val TS_SEARCH_BYTES_HM = TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES
 		const val MEDIA_ITEM_COUNT_MAX = 10
+
+		// MTK chip detection for hardware decoding priority
+		private fun isMtkDevice(context: Context): Boolean {
+			val manufacturer = android.os.Build.MANUFACTURER.lowercase()
+			val hardware = android.os.Build.HARDWARE.lowercase()
+			return manufacturer.contains("mediatek") || manufacturer.contains("mtk") ||
+				hardware.contains("mt") || hardware.contains("mediatek")
+		}
 	}
 
 	private var currentStream: PlayableMediaStream? = null
@@ -99,10 +107,14 @@ class ExoPlayerBackend(
 
 		val renderersFactory = DefaultRenderersFactory(context).apply {
 			setEnableDecoderFallback(true)
+			// MTK devices (e.g. XGIMI H6 with MTK9669) have strong hardware decoders
+			// Disable FFmpeg extensions when MTK hardware is available for better performance
+			val useMtkHardware = isMtkDevice(context)
 			setExtensionRendererMode(
-				when (exoPlayerOptions.preferFfmpeg) {
-					true -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-					false -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+				when {
+					useMtkHardware -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+					exoPlayerOptions.preferFfmpeg -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+					else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
 				}
 			)
 		}.let { renderersFactory ->

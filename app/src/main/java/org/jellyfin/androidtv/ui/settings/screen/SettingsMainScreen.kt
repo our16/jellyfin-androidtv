@@ -82,5 +82,14 @@ fun SettingsMainScreen() {
 				modifier = Modifier.focusKey(Routes.ABOUT),
 			)
 		}
+
+		item {
+			ListButton(
+				headingContent = { Text("应用更新") },
+				captionContent = { Text("检查并更新应用") },
+				onClick = { router.push(Routes.APP_UPDATE) },
+				modifier = Modifier.focusKey(Routes.APP_UPDATE),
+			)
+		}
 	}
 }

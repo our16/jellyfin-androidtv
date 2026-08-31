@@ -24,6 +24,8 @@ import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.data.repository.ItemMutationRepositoryImpl
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepositoryImpl
+import org.jellyfin.androidtv.data.repository.AppUpdateRepository
+import org.jellyfin.androidtv.data.repository.AppUpdateRepositoryImpl
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepositoryImpl
 import org.jellyfin.androidtv.data.service.BackgroundService
@@ -132,6 +134,13 @@ val appModule = module {
 			serviceLoaderEnabled(false)
 			logger(CoilTimberLogger(if (BuildConfig.DEBUG) Logger.Level.Warn else Logger.Level.Error))
 
+			// Limit memory cache for 4GB RAM devices (e.g. XGIMI H6)
+			memoryCache {
+				coil3.memory.MemoryCache.Builder()
+					.maxSizeBytes(64 * 1024 * 1024) // 64MB
+					.build()
+			}
+
 			components {
 				add(get<NetworkFetcher.Factory>())
 
@@ -150,6 +159,7 @@ val appModule = module {
 	single<UserRepository> { UserRepositoryImpl() }
 	single<UserViewsRepository> { UserViewsRepositoryImpl(get()) }
 	single<NotificationsRepository> { NotificationsRepositoryImpl(get(), get()) }
+	single<AppUpdateRepository> { AppUpdateRepositoryImpl(get()) }
 	single<ItemMutationRepository> { ItemMutationRepositoryImpl(get(), get()) }
 	single<CustomMessageRepository> { CustomMessageRepositoryImpl() }
 	single<NavigationRepository> { NavigationRepositoryImpl(Destinations.home) }

@@ -4,6 +4,7 @@ import org.jellyfin.androidtv.ui.navigation.RouteComposable
 import org.jellyfin.androidtv.ui.settings.screen.SettingsDeveloperScreen
 import org.jellyfin.androidtv.ui.settings.screen.SettingsMainScreen
 import org.jellyfin.androidtv.ui.settings.screen.SettingsTelemetryScreen
+import org.jellyfin.androidtv.ui.settings.screen.SettingsAppUpdateScreen
 import org.jellyfin.androidtv.ui.settings.screen.about.SettingsAboutScreen
 import org.jellyfin.androidtv.ui.settings.screen.authentication.SettingsAuthenticationAutoSignInScreen
 import org.jellyfin.androidtv.ui.settings.screen.authentication.SettingsAuthenticationScreen
@@ -110,6 +111,7 @@ object Routes {
 	const val LICENSES = "/licenses"
 	const val LICENSE = "/license/{artifactId}"
 	const val CUSTOMIZATION_UI_PLUGIN = "/customization/ui-plugin"
+	const val APP_UPDATE = "/app-update"
 }
 
 val routes = mapOf<String, RouteComposable>(
@@ -286,5 +288,8 @@ val routes = mapOf<String, RouteComposable>(
 		SettingsLicenseScreen(
 			artifactId = context.parameters["artifactId"]!!
 		)
+	},
+	Routes.APP_UPDATE to {
+		SettingsAppUpdateScreen()
 	},
 )
