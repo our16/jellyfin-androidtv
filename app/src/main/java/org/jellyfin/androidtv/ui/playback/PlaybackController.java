@@ -1070,7 +1070,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             Timber.i("Duration reported as: %s current pos: %s", getDuration(), mCurrentPosition);
 
             mSeekPosition = currentSkipPos;
-            mHandler.postDelayed(skipRunnable, 800);
+            mHandler.postDelayed(skipRunnable, 2000);
         }
     }
 
