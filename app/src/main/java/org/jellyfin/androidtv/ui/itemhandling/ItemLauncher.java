@@ -148,6 +148,15 @@ public class ItemLauncher {
                     }
 
                     navigationRepository.getValue().navigate(Destinations.INSTANCE.libraryBrowser(baseItem, null));
+                } else if (baseItem.getType() == BaseItemKind.EPISODE) {
+                    // Episodes play directly without showing details page
+                    playbackHelper.getValue().getItemsToPlay(context, baseItem, false, false, new Response<List<BaseItemDto>>() {
+                        @Override
+                        public void onResponse(List<BaseItemDto> response) {
+                            if (!isActive()) return;
+                            playbackLauncher.getValue().launch(context, response);
+                        }
+                    });
                 } else {
                     switch (rowItem.getSelectAction()) {
 
