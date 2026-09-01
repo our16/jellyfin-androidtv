@@ -59,25 +59,39 @@ class AppUpdateRepositoryImpl(
 				isChecking.value = false
 				return null
 			}
-			val response = withContext(Dispatchers.IO) {
-				val url = "$baseUrl/AppUpdate/Check"
-				val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-				connection.requestMethod = "GET"
-				connection.setRequestProperty(
-					"Authorization",
-					api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: ""
-				)
-				connection.setRequestProperty("Client", "Jellyfin for Android TV")
-				connection.setRequestProperty("Version", BuildConfig.VERSION_NAME)
-				connection.connectTimeout = 10000
-				connection.readTimeout = 10000
+		val response = withContext(Dispatchers.IO) {
+			val versionName = BuildConfig.VERSION_NAME
+			val versionCode = calcVersionCode(versionName)
+			val uri = Uri.parse("$baseUrl/AppUpdate/Check").buildUpon()
+				.appendQueryParameter("currentVersionCode", versionCode.toString())
+				.appendQueryParameter("currentVersion", versionName)
+				.appendQueryParameter("channel", "stable")
+				.build()
+			val connection = java.net.URL(uri.toString()).openConnection() as java.net.HttpURLConnection
+			connection.requestMethod = "GET"
+			connection.setRequestProperty(
+				"Authorization",
+				api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: ""
+			)
+			connection.setRequestProperty("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"$versionName\"")
+			connection.setRequestProperty("Client", "Jellyfin for Android TV")
+			connection.setRequestProperty("Version", versionName)
+			connection.connectTimeout = 10000
+			connection.readTimeout = 10000
 
-				if (connection.responseCode == 200) {
-					parseUpdateInfo(connection.inputStream.bufferedReader().readText())
-				} else {
-					null
-				}
+			if (connection.responseCode == 200) {
+				val body = connection.inputStream.bufferedReader().readText()
+				// Prepend base URL to relative download URLs
+				val fixedBody = body.replace(
+					"\"/AppUpdate/Download",
+					"\"$baseUrl/AppUpdate/Download"
+				)
+				parseUpdateInfo(fixedBody)
+			} else {
+				Timber.w("Update check failed with code %d", connection.responseCode)
+				null
 			}
+		}
 			updateInfo.value = response
 			isChecking.value = false
 			response
@@ -184,5 +198,18 @@ class AppUpdateRepositoryImpl(
 			addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
 		}
 		context.startActivity(intent)
+	}
+
+	private fun calcVersionCode(versionName: String): Int {
+		val (core, preRelease) = when (val idx = versionName.indexOf('-')) {
+			-1 -> versionName to null
+			else -> versionName.substring(0, idx) to versionName.substring(idx + 1)
+		}
+		val parts = core.split('.').mapNotNull { it.toIntOrNull() }.take(3)
+		val major = parts.getOrElse(0) { 0 }
+		val minor = parts.getOrElse(1) { 0 }
+		val patch = parts.getOrElse(2) { 0 }
+		val build = preRelease?.substringAfter('.')?.toIntOrNull() ?: 99
+		return major * 1000000 + minor * 10000 + patch * 100 + build
 	}
 }
