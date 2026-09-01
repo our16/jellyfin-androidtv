@@ -10,3 +10,4 @@ captures/
 
 # Signing keys - never commit
 keystore/
+*.hprof
