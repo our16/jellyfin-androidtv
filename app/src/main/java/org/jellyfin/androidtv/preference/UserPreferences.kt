@@ -104,8 +104,9 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 
 		/**
 		 * Whether ExoPlayer should prefer FFmpeg renderers to core ones.
+		 * Enabled by default for better codec compatibility (Dolby Vision, DTS-HD MA, etc.)
 		 */
-		var preferExoPlayerFfmpeg = booleanPreference("exoplayer_prefer_ffmpeg", defaultValue = false)
+		var preferExoPlayerFfmpeg = booleanPreference("exoplayer_prefer_ffmpeg", defaultValue = true)
 
 		/**
 		 * User defined AVC level override. AUTO uses device-reported capabilities.
