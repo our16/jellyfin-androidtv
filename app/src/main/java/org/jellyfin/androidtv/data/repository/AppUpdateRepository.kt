@@ -103,17 +103,18 @@ class AppUpdateRepositoryImpl(
 	}
 
 	private fun parseUpdateInfo(json: String): AppUpdateInfo {
-		val updateAvailable = json.contains("\"updateAvailable\":true")
+		val updateAvailable = json.contains("\"UpdateAvailable\":true", ignoreCase = true) ||
+			json.contains("\"updateAvailable\":true", ignoreCase = true)
 		if (!updateAvailable) return AppUpdateInfo(updateAvailable = false)
 
 		return AppUpdateInfo(
 			updateAvailable = true,
-			appVersion = extractString(json, "appVersion"),
-			appVersionCode = extractInt(json, "appVersionCode"),
-			downloadUrl = extractString(json, "downloadUrl"),
-			downloadSize = extractLong(json, "downloadSize"),
-			checksum = extractString(json, "checksum"),
-			mandatory = json.contains("\"mandatory\":true"),
+			appVersion = extractString(json, "AppVersion").ifEmpty { extractString(json, "appVersion") },
+			appVersionCode = extractInt(json, "AppVersionCode").takeIf { it > 0 } ?: extractInt(json, "appVersionCode"),
+			downloadUrl = extractString(json, "DownloadUrl").ifEmpty { extractString(json, "downloadUrl") },
+			downloadSize = extractLong(json, "DownloadSize").takeIf { it > 0 } ?: extractLong(json, "downloadSize"),
+			checksum = extractString(json, "Checksum").ifEmpty { extractString(json, "checksum") },
+			mandatory = json.contains("\"Mandatory\":true", ignoreCase = true) || json.contains("\"mandatory\":true", ignoreCase = true),
 		)
 	}
 
