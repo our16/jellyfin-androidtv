@@ -41,6 +41,13 @@ object PlaybackErrorReporter {
     }
 
     /**
+     * Get current API client (dynamically to get updated baseUrl).
+     */
+    private fun getApi(): ApiClient? {
+        return apiClient
+    }
+
+    /**
      * Log a detailed playback error with full context.
      */
     fun reportError(
@@ -49,6 +56,9 @@ object PlaybackErrorReporter {
         retryCount: Int = 0,
         currentPosition: Long = 0,
     ) {
+        Timber.i(TAG, "reportError called: ${error.javaClass.simpleName}: ${error.message}")
+        Timber.i(TAG, "API client: ${apiClient != null}, baseUrl: ${apiClient?.baseUrl}, token: ${apiClient?.accessToken?.take(10)}...")
+
         val sb = StringBuilder()
 
         sb.appendLine("=== PLAYBACK ERROR REPORT ===")
@@ -154,8 +164,23 @@ object PlaybackErrorReporter {
         retryCount: Int,
         currentPosition: Long,
     ) {
-        val api = apiClient ?: return
-        val baseUrl = api.baseUrl ?: return
+        val api = getApi()
+        if (api == null) {
+            Timber.w(TAG, "API client not initialized, cannot send error report")
+            return
+        }
+        val baseUrl = api.baseUrl
+        if (baseUrl.isNullOrEmpty()) {
+            Timber.w(TAG, "API baseUrl is null or empty, cannot send error report")
+            return
+        }
+        val token = api.accessToken
+        if (token.isNullOrEmpty()) {
+            Timber.w(TAG, "API accessToken is null or empty, cannot send error report")
+            return
+        }
+
+        Timber.i(TAG, "Sending error report to: $baseUrl/AppUpdate/Report")
 
         scope.launch {
             try {
@@ -190,20 +215,22 @@ object PlaybackErrorReporter {
 
                 val request = Request.Builder()
                     .url("$baseUrl/AppUpdate/Report")
-                    .addHeader("Authorization", api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: "")
+                    .addHeader("Authorization", "MediaBrowser Token=\"$token\"")
                     .addHeader("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"${BuildConfig.VERSION_NAME}\"")
                     .addHeader("Accept", "application/json; profile=\"CamelCase\"")
                     .post(body.toRequestBody("application/json".toMediaType()))
                     .build()
 
+                Timber.i(TAG, "Request URL: ${request.url}")
                 val response = httpClient.newCall(request).execute()
+                Timber.i(TAG, "Response code: ${response.code}")
                 if (response.isSuccessful) {
-                    Timber.i(TAG, "Error report sent to server")
+                    Timber.i(TAG, "Error report sent to server successfully")
                 } else {
                     Timber.w(TAG, "Failed to send error report: ${response.code}")
                 }
             } catch (e: Exception) {
-                Timber.w(TAG, "Failed to send error report to server: ${e.message}")
+                Timber.e(TAG, "Failed to send error report to server: ${e.message}")
             }
         }
     }
