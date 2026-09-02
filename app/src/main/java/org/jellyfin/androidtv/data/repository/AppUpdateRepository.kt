@@ -121,28 +121,30 @@ class AppUpdateRepositoryImpl(
 	}
 
 	private fun parseUpdateInfo(json: String): AppUpdateInfo {
-		val updateAvailable = json.contains("\"updateAvailable\":true")
+		// Server may return PascalCase or camelCase, handle both
+		val jsonLower = json.lowercase()
+		val updateAvailable = jsonLower.contains("\"updateavailable\":true")
 		if (!updateAvailable) return AppUpdateInfo(updateAvailable = false)
 
 		return AppUpdateInfo(
 			updateAvailable = true,
-			appVersion = extractString(json, "appVersion"),
-			appVersionCode = extractInt(json, "appVersionCode"),
-			downloadUrl = extractString(json, "downloadUrl"),
-			downloadSize = extractLong(json, "downloadSize"),
-			checksum = extractString(json, "checksum"),
-			mandatory = json.contains("\"mandatory\":true"),
+			appVersion = extractString(json, "appVersion") ?: extractString(json, "AppVersion") ?: "",
+			appVersionCode = extractInt(json, "appVersionCode") ?: extractInt(json, "AppVersionCode") ?: 0,
+			downloadUrl = extractString(json, "downloadUrl") ?: extractString(json, "DownloadUrl") ?: "",
+			downloadSize = extractLong(json, "downloadSize") ?: extractLong(json, "DownloadSize") ?: 0,
+			checksum = extractString(json, "checksum") ?: extractString(json, "Checksum") ?: "",
+			mandatory = jsonLower.contains("\"mandatory\":true"),
 		)
 	}
 
-	private fun extractString(json: String, key: String): String =
-		Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: ""
+	private fun extractString(json: String, key: String): String? =
+		Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1)
 
-	private fun extractInt(json: String, key: String): Int =
-		Regex("\"$key\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+	private fun extractInt(json: String, key: String): Int? =
+		Regex("\"$key\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toIntOrNull()
 
-	private fun extractLong(json: String, key: String): Long =
-		Regex("\"$key\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+	private fun extractLong(json: String, key: String): Long? =
+		Regex("\"$key\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toLongOrNull()
 
 	override suspend fun downloadApk(context: Context, updateInfo: AppUpdateInfo) {
 		if (updateInfo.downloadUrl.isEmpty()) {
