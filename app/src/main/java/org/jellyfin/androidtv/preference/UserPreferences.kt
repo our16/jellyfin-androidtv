@@ -17,6 +17,7 @@ import org.jellyfin.androidtv.preference.constant.WatchedIndicatorBehavior
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
 import org.jellyfin.androidtv.ui.playback.segment.toMediaSegmentActionsString
+import org.jellyfin.androidtv.util.profile.KnownDefects
 import org.jellyfin.preference.booleanPreference
 import org.jellyfin.preference.enumPreference
 import org.jellyfin.preference.floatPreference
@@ -51,8 +52,9 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/* Playback - General*/
 		/**
 		 * Maximum bitrate in megabit for playback.
+		 * XGIMI devices use lower default to force server transcoding for high-bitrate 4K content.
 		 */
-		var maxBitrate = stringPreference("pref_max_bitrate", "100")
+		var maxBitrate = stringPreference("pref_max_bitrate", if (KnownDefects.isXgimiProjector) "20" else "100")
 
 		/**
 		 * Auto-play next item

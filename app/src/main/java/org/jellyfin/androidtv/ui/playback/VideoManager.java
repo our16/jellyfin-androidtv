@@ -88,6 +88,12 @@ public class VideoManager {
     private long lastExoPlayerPosition = -1;
     private boolean nightModeEnabled;
 
+    // Buffering timeout detection
+    private long bufferingStartTime = 0;
+    private boolean bufferingWarningShown = false;
+    private static final long BUFFERING_WARNING_TIMEOUT_MS = 10000; // 10 seconds
+    private static final long BUFFERING_CRITICAL_TIMEOUT_MS = 30000; // 30 seconds
+
     public boolean isContracted = false;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
@@ -144,6 +150,7 @@ public class VideoManager {
                 Timber.e("***** Got error from player");
                 if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onError();
                 stopProgressLoop();
+                cancelBufferingTimeout();
             }
 
             @Override
@@ -152,6 +159,7 @@ public class VideoManager {
                     if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onPrepared();
                     startProgressLoop();
                     _helper.setScreensaverLock(true);
+                    cancelBufferingTimeout();
                 } else {
                     stopProgressLoop();
                     _helper.setScreensaverLock(false);
@@ -162,11 +170,15 @@ public class VideoManager {
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_BUFFERING) {
                     Timber.d("Player is buffering");
+                    startBufferingTimeout();
+                } else if (playbackState == Player.STATE_READY) {
+                    cancelBufferingTimeout();
                 }
 
                 if (playbackState == Player.STATE_ENDED) {
                     if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onCompletion();
                     stopProgressLoop();
+                    cancelBufferingTimeout();
                 }
             }
 
@@ -654,6 +666,60 @@ public class VideoManager {
 
         isContracted = false;
     }
+
+    // Buffering timeout detection methods
+    private void startBufferingTimeout() {
+        if (bufferingStartTime == 0) {
+            bufferingStartTime = System.currentTimeMillis();
+            bufferingWarningShown = false;
+            Timber.d("Buffering timeout started");
+        }
+        // Check for timeout
+        mHandler.postDelayed(bufferingTimeoutRunnable, 1000);
+    }
+
+    private void cancelBufferingTimeout() {
+        bufferingStartTime = 0;
+        bufferingWarningShown = false;
+        mHandler.removeCallbacks(bufferingTimeoutRunnable);
+    }
+
+    private final Runnable bufferingTimeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (bufferingStartTime == 0) return;
+
+            long elapsed = System.currentTimeMillis() - bufferingStartTime;
+
+            if (elapsed >= BUFFERING_CRITICAL_TIMEOUT_MS && !bufferingWarningShown) {
+                // Critical: suggest lowering quality
+                if (mActivity != null) {
+                    mActivity.runOnUiThread(() -> {
+                        android.widget.Toast.makeText(mActivity,
+                            "缓冲时间过长，可能是码率过高。请在设置中降低最大码率或联系管理员开启转码。",
+                            android.widget.Toast.LENGTH_LONG).show();
+                    });
+                }
+                bufferingWarningShown = true;
+                Timber.w("Buffering critical timeout: %d ms", elapsed);
+            } else if (elapsed >= BUFFERING_WARNING_TIMEOUT_MS && !bufferingWarningShown) {
+                // Warning
+                if (mActivity != null) {
+                    mActivity.runOnUiThread(() -> {
+                        android.widget.Toast.makeText(mActivity,
+                            "正在缓冲，请稍候...",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                }
+                Timber.w("Buffering warning timeout: %d ms", elapsed);
+            }
+
+            // Continue checking if still buffering
+            if (bufferingStartTime > 0 && elapsed < BUFFERING_CRITICAL_TIMEOUT_MS) {
+                mHandler.postDelayed(this, 1000);
+            }
+        }
+    };
 
     private Runnable progressLoop;
 
