@@ -86,6 +86,7 @@ class AppUpdateRepositoryImpl(
 					api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: ""
 				)
 				connection.setRequestProperty("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"$versionName\"")
+				connection.setRequestProperty("Accept", "application/json; profile=\"CamelCase\"")
 				connection.connectTimeout = 10000
 				connection.readTimeout = 10000
 
@@ -165,6 +166,7 @@ class AppUpdateRepositoryImpl(
 					.url(updateInfo.downloadUrl)
 					.addHeader("Authorization", api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: "")
 					.addHeader("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"${BuildConfig.VERSION_NAME}\"")
+					.addHeader("Accept", "application/json; profile=\"CamelCase\"")
 					.build()
 
 				val response = httpClient.newCall(request).execute()
