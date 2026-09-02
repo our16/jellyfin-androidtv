@@ -271,6 +271,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             play(mCurrentPosition);
         } else {
             mPlaybackState = PlaybackState.ERROR;
+            // Report failed playback to server
+            if (getCurrentlyPlayingItem() != null && mCurrentStreamInfo != null) {
+                reportingHelper.getValue().reportFailed(mFragment, getCurrentlyPlayingItem(), mCurrentStreamInfo, mCurrentPosition * 10000);
+            }
             if (mFragment != null) {
                 Utils.showToast(mFragment.getContext(), mFragment.getString(R.string.too_many_errors));
                 mFragment.closePlayer();
@@ -599,6 +603,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     private void handlePlaybackInfoError(Exception exception) {
         Timber.e(exception, "Error getting playback stream info");
+        PlaybackErrorReporter.INSTANCE.reportError(exception, mCurrentStreamInfo, playbackRetries, mCurrentPosition);
         if (mFragment == null) return;
         if (exception instanceof PlaybackException) {
             PlaybackException ex = (PlaybackException) exception;
@@ -1268,6 +1273,14 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             playerErrorEncountered();
             return;
         }
+
+        // Log detailed error info
+        PlaybackErrorReporter.INSTANCE.reportError(
+            new RuntimeException("Player error callback triggered"),
+            mCurrentStreamInfo,
+            playbackRetries,
+            mCurrentPosition
+        );
 
         if (isLiveTv && directStreamLiveTv) {
             Utils.showToast(mFragment.getContext(), mFragment.getString(R.string.msg_error_live_stream));

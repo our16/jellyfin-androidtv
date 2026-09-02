@@ -96,6 +96,8 @@ public class VideoManager {
 
     public boolean isContracted = false;
 
+    private StreamInfo mCurrentStreamInfo;
+
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
     private final HttpDataSource.Factory exoPlayerHttpDataSourceFactory = KoinJavaComponent.get(HttpDataSource.Factory.class);
 
@@ -148,6 +150,7 @@ public class VideoManager {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
                 Timber.e("***** Got error from player");
+                PlaybackErrorReporter.INSTANCE.reportError(error, mCurrentStreamInfo, 0, getCurrentPosition());
                 if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onError();
                 stopProgressLoop();
                 cancelBufferingTimeout();
@@ -399,12 +402,14 @@ public class VideoManager {
     }
 
     public void setMediaStreamInfo(ApiClient api, StreamInfo streamInfo) {
+        mCurrentStreamInfo = streamInfo;
         String path = streamInfo.getMediaUrl();
         if (path == null) {
             Timber.w("Video path is null cannot continue");
             return;
         }
         Timber.i("Video path set to: %s", path);
+        PlaybackErrorReporter.INSTANCE.logStreamConfig(streamInfo);
 
         try {
             // Add external subtitles

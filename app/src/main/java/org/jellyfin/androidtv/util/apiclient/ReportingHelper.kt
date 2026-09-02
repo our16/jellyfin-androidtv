@@ -113,4 +113,22 @@ class ReportingHelper(
 			else -> Unit
 		}
 	}
+
+	fun reportFailed(lifecycleOwner: LifecycleOwner, item: BaseItemDto, streamInfo: StreamInfo, position: Long?) {
+		val info = PlaybackStopInfo(
+			itemId = item.id,
+			positionTicks = position,
+			mediaSourceId = streamInfo.mediaSourceId,
+			liveStreamId = streamInfo.mediaSource?.liveStreamId,
+			playSessionId = streamInfo.playSessionId,
+			failed = true,
+		)
+
+		lifecycleOwner.lifecycleScope.launch(Dispatchers.IO + NonCancellable) {
+			Timber.i("Reporting ${item.name} playback FAILED at $position")
+			runCatching {
+				api.playStateApi.reportPlaybackStopped(info)
+			}.onFailure { error -> Timber.e(error, "Failed to report failed playback!") }
+		}
+	}
 }
