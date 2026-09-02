@@ -1,14 +1,22 @@
 package org.jellyfin.androidtv.ui.playback
 
+import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.data.compat.StreamInfo
-import org.jellyfin.sdk.model.api.MediaStream
+import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.MediaStreamType
-import org.jellyfin.sdk.model.api.PlayMethod
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Comprehensive playback error reporter for debugging playback failures.
@@ -17,6 +25,20 @@ import java.util.Locale
 object PlaybackErrorReporter {
 
     private const val TAG = "PlaybackError"
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private var apiClient: ApiClient? = null
+
+    /**
+     * Initialize with API client for server reporting.
+     */
+    fun init(api: ApiClient) {
+        apiClient = api
+    }
 
     /**
      * Log a detailed playback error with full context.
@@ -118,6 +140,81 @@ object PlaybackErrorReporter {
 
         // Also log to stdout for immediate visibility
         println(sb.toString())
+
+        // Send to server
+        sendToServer(error, streamInfo, retryCount, currentPosition)
+    }
+
+    /**
+     * Send error report to server.
+     */
+    private fun sendToServer(
+        error: Throwable,
+        streamInfo: StreamInfo?,
+        retryCount: Int,
+        currentPosition: Long,
+    ) {
+        val api = apiClient ?: return
+        val baseUrl = api.baseUrl ?: return
+
+        scope.launch {
+            try {
+                val videoStream = streamInfo?.mediaSource?.mediaStreams?.firstOrNull { it.type == MediaStreamType.VIDEO }
+                val audioStream = streamInfo?.mediaSource?.mediaStreams?.firstOrNull { it.type == MediaStreamType.AUDIO }
+
+                val report = mapOf(
+                    "appVersion" to BuildConfig.VERSION_NAME,
+                    "appVersionCode" to BuildConfig.VERSION_CODE,
+                    "deviceManufacturer" to Build.MANUFACTURER,
+                    "deviceModel" to Build.MODEL,
+                    "androidVersion" to Build.VERSION.RELEASE,
+                    "errorType" to error.javaClass.simpleName,
+                    "errorMessage" to (error.message ?: ""),
+                    "stackTrace" to error.stackTrace.take(20).joinToString("\n") { "  at $it" },
+                    "playMethod" to (streamInfo?.playMethod?.toString() ?: "UNKNOWN"),
+                    "container" to (streamInfo?.container ?: ""),
+                    "videoCodec" to (videoStream?.codec ?: ""),
+                    "videoResolution" to if (videoStream != null) "${videoStream.width}x${videoStream.height}" else "",
+                    "audioCodec" to (audioStream?.codec ?: ""),
+                    "audioChannels" to (audioStream?.channels ?: 0),
+                    "mediaUrl" to (streamInfo?.mediaUrl?.take(200) ?: ""),
+                    "retryCount" to retryCount,
+                    "currentPositionMs" to currentPosition,
+                    "timestamp" to SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+                )
+
+                val json = report.entries.joinToString(",") { (key, value) ->
+                    "\"$key\":${toJsonValue(value)}"
+                }
+                val body = "{$json}"
+
+                val request = Request.Builder()
+                    .url("$baseUrl/AppUpdate/Report")
+                    .addHeader("Authorization", api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: "")
+                    .addHeader("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"${BuildConfig.VERSION_NAME}\"")
+                    .addHeader("Accept", "application/json; profile=\"CamelCase\"")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = httpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    Timber.i(TAG, "Error report sent to server")
+                } else {
+                    Timber.w(TAG, "Failed to send error report: ${response.code}")
+                }
+            } catch (e: Exception) {
+                Timber.w(TAG, "Failed to send error report to server: ${e.message}")
+            }
+        }
+    }
+
+    private fun toJsonValue(value: Any?): String {
+        return when (value) {
+            is String -> "\"${value.replace("\"", "\\\"").replace("\n", "\\n")}\""
+            is Number -> value.toString()
+            is Boolean -> value.toString()
+            else -> "\"$value\""
+        }
     }
 
     /**

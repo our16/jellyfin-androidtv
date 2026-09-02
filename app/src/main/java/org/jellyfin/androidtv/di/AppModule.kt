@@ -81,6 +81,8 @@ import org.jellyfin.androidtv.ui.plugin.UiPluginPreferencesImpl
 import org.jellyfin.androidtv.ui.plugin.UiPluginRegistry
 import org.jellyfin.androidtv.ui.plugin.DefaultUiPlugin
 import org.jellyfin.androidtv.ui.plugin.BilibiliStyleUiPlugin
+import org.jellyfin.androidtv.ui.playback.PlaybackErrorReporter
+import org.jellyfin.sdk.api.client.ApiClient
 
 val defaultDeviceInfo = named("defaultDeviceInfo")
 
@@ -113,6 +115,13 @@ val appModule = module {
 	single {
 		// Create an empty API instance, the actual values are set by the SessionRepository
 		get<JellyfinSdk>().createApi(httpClientOptions = get<HttpClientOptions>())
+	}
+
+	// Initialize PlaybackErrorReporter with API client
+	single {
+		val api = get<ApiClient>()
+		PlaybackErrorReporter.init(api)
+		Unit
 	}
 
 	single { SocketHandler(get(), get(), get(), get(), get(), get(), get(), get(), get(), ProcessLifecycleOwner.get().lifecycle) }
