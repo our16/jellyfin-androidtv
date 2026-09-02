@@ -64,8 +64,15 @@ class ExoPlayerBackend(
 		private fun isMtkDevice(context: Context): Boolean {
 			val manufacturer = android.os.Build.MANUFACTURER.lowercase()
 			val hardware = android.os.Build.HARDWARE.lowercase()
+			val product = android.os.Build.PRODUCT.lowercase()
+			val board = android.os.Build.BOARD.lowercase()
+			val fingerprint = android.os.Build.FINGERPRINT.lowercase()
+			// Check multiple sources for MTK chip identification
 			return manufacturer.contains("mediatek") || manufacturer.contains("mtk") ||
-				hardware.contains("mt") || hardware.contains("mediatek")
+				hardware.contains("mt") || hardware.contains("mediatek") ||
+				product.contains("mt") || board.contains("mt") ||
+				fingerprint.contains("mediatek") || fingerprint.contains("mt9") ||
+				fingerprint.contains("mtk")
 		}
 	}
 
@@ -107,15 +114,11 @@ class ExoPlayerBackend(
 
 		val renderersFactory = DefaultRenderersFactory(context).apply {
 			setEnableDecoderFallback(true)
-			// MTK devices (e.g. XGIMI H6 with MTK9669) have strong hardware decoders
-			// Disable FFmpeg extensions when MTK hardware is available for better performance
-			val useMtkHardware = isMtkDevice(context)
+			// Use FFmpeg as fallback for unsupported codecs (DV, DTS-HD MA, etc.)
+			// ExoPlayer will try hardware decoding first, then fall back to FFmpeg
 			setExtensionRendererMode(
-				when {
-					useMtkHardware -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
-					exoPlayerOptions.preferFfmpeg -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-					else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-				}
+				if (exoPlayerOptions.preferFfmpeg) DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+				else DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
 			)
 		}.let { renderersFactory ->
 			if (exoPlayerOptions.enableLibass) AssRenderersFactory(assHandler, renderersFactory)
