@@ -28,8 +28,6 @@ private val supportedAudioCodecs = arrayOf(
 	Codec.Audio.AAC_LATM,
 	Codec.Audio.AC3,
 	Codec.Audio.ALAC,
-	Codec.Audio.DCA,
-	Codec.Audio.DTS,
 	Codec.Audio.EAC3,
 	Codec.Audio.FLAC,
 	Codec.Audio.MLP,
@@ -60,7 +58,6 @@ private val hlsFmp4AudioCodecs = arrayOf(
 	Codec.Audio.ALAC,
 	Codec.Audio.FLAC,
 	Codec.Audio.OPUS,
-	Codec.Audio.DTS,
 	Codec.Audio.TRUEHD
 )
 

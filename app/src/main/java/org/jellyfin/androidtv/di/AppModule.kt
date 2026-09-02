@@ -90,7 +90,7 @@ val appModule = module {
 	// SDK
 	single(defaultDeviceInfo) { androidDevice(get()) }
 	single { OkHttpFactory() }
-	single { HttpClientOptions() }
+	single { HttpClientOptions(requestTimeout = kotlin.time.Duration.parse("60s")) }
 	single {
 		createJellyfin {
 			context = androidContext()
