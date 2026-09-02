@@ -148,6 +148,9 @@ class AppUpdateRepositoryImpl(
 						"jellyfin-${updateInfo.appVersion}.apk"
 					)
 					.setAllowedOverMetered(true)
+					// Add auth headers for server authentication
+					.addRequestHeader("Authorization", api.accessToken?.let { "MediaBrowser Token=\"$it\"" } ?: "")
+					.addRequestHeader("X-Emby-Authorization", "MediaBrowser Client=\"Jellyfin for Android TV\", Device=\"androidtv\", Version=\"${BuildConfig.VERSION_NAME}\"")
 
 				val downloadId = dm.enqueue(request)
 				Timber.i("Download started: $downloadId")
@@ -192,8 +195,13 @@ class AppUpdateRepositoryImpl(
 	}
 
 	private fun launchInstaller(context: Context, apkFile: File) {
+		val uri = androidx.core.content.FileProvider.getUriForFile(
+			context,
+			"${BuildConfig.APPLICATION_ID}.fileprovider",
+			apkFile
+		)
 		val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-			setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
+			setDataAndType(uri, "application/vnd.android.package-archive")
 			addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
 			addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
 		}
