@@ -69,6 +69,10 @@ import io.github.peerless2012.ass.media.kt.AssPlayerKt;
 import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory;
 import io.github.peerless2012.ass.media.type.AssRenderType;
 import io.github.peerless2012.ass.media.widget.AssSubtitleView;
+import org.jellyfin.danmaku.DanmakuManager;
+import org.jellyfin.danmaku.JellyfinDanmakuParser;
+import org.jellyfin.danmaku.DanmakuDataSource;
+
 import timber.log.Timber;
 
 @OptIn(markerClass = UnstableApi.class)
@@ -97,6 +101,9 @@ public class VideoManager {
     public boolean isContracted = false;
 
     private StreamInfo mCurrentStreamInfo;
+    private DanmakuManager danmakuManager;
+    private JellyfinDanmakuParser danmakuParser;
+    private boolean danmakuEnabled = false;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
     private final HttpDataSource.Factory exoPlayerHttpDataSourceFactory = KoinJavaComponent.get(HttpDataSource.Factory.class);
@@ -145,6 +152,9 @@ public class VideoManager {
             assHandler.init(mExoPlayer);
             mExoPlayerView.getSubtitleView().addView(new AssSubtitleView(mActivity, assHandler));
         }
+
+        // Initialize danmaku manager
+        initializeDanmaku(view);
 
         mExoPlayer.addListener(new Player.Listener() {
             @Override
@@ -353,14 +363,17 @@ public class VideoManager {
         mExoPlayer.setPlayWhenReady(true);
         normalWidth = mExoPlayerView.getLayoutParams().width;
         normalHeight = mExoPlayerView.getLayoutParams().height;
+        startDanmaku();
     }
 
     public void play() {
         mExoPlayer.setPlayWhenReady(true);
+        resumeDanmaku();
     }
 
     public void pause() {
         mExoPlayer.setPlayWhenReady(false);
+        pauseDanmaku();
     }
 
     public void stopPlayback() {
@@ -374,6 +387,7 @@ public class VideoManager {
         }
 
         stopProgressLoop();
+        releaseDanmaku();
     }
 
     public boolean isSeekable() {
@@ -391,6 +405,7 @@ public class VideoManager {
 
         Timber.i("Exo length in seek is: %d", getDuration());
         mExoPlayer.seekTo(pos);
+        seekDanmaku(pos);
         return pos;
     }
 
@@ -744,5 +759,110 @@ public class VideoManager {
         if (progressLoop != null) {
             mHandler.removeCallbacks(progressLoop);
         }
+    }
+
+    // Danmaku methods
+    private void initializeDanmaku(View view) {
+        try {
+            danmakuManager = new DanmakuManager(mActivity);
+            View danmakuView = view.findViewById(R.id.danmaku_view);
+            if (danmakuView instanceof master.flame.danmaku.ui.widget.DanmakuTextureView) {
+                danmakuManager.initialize((master.flame.danmaku.ui.widget.DanmakuTextureView) danmakuView);
+                danmakuParser = new JellyfinDanmakuParser();
+                Timber.d("Danmaku manager initialized");
+            }
+        } catch (Exception e) {
+            Timber.e(e, "Failed to initialize danmaku");
+            danmakuManager = null;
+        }
+    }
+
+    /**
+     * Load danmaku data from XML string.
+     */
+    public void loadDanmaku(String xmlData) {
+        if (danmakuManager == null || danmakuParser == null) return;
+        
+        try {
+            DanmakuDataSource dataSource = new DanmakuDataSource();
+            dataSource.loadFromString(xmlData);
+            danmakuParser.load(dataSource);
+            danmakuManager.loadDanmaku(danmakuParser);
+            danmakuEnabled = true;
+            Timber.d("Danmaku loaded");
+        } catch (Exception e) {
+            Timber.e(e, "Failed to load danmaku");
+        }
+    }
+
+    /**
+     * Start danmaku playback.
+     */
+    public void startDanmaku() {
+        if (danmakuManager != null && danmakuEnabled) {
+            danmakuManager.start(getCurrentPosition());
+        }
+    }
+
+    /**
+     * Pause danmaku playback.
+     */
+    public void pauseDanmaku() {
+        if (danmakuManager != null && danmakuEnabled) {
+            danmakuManager.pause();
+        }
+    }
+
+    /**
+     * Resume danmaku playback.
+     */
+    public void resumeDanmaku() {
+        if (danmakuManager != null && danmakuEnabled) {
+            danmakuManager.resume();
+        }
+    }
+
+    /**
+     * Seek danmaku to position.
+     */
+    public void seekDanmaku(long position) {
+        if (danmakuManager != null && danmakuEnabled) {
+            danmakuManager.seekTo(position);
+        }
+    }
+
+    /**
+     * Toggle danmaku visibility.
+     */
+    public void toggleDanmaku() {
+        if (danmakuManager != null) {
+            danmakuManager.toggleVisibility();
+        }
+    }
+
+    /**
+     * Check if danmaku is visible.
+     */
+    public boolean isDanmakuVisible() {
+        return danmakuManager != null && danmakuManager.isDanmakuVisible();
+    }
+
+    /**
+     * Check if danmaku is enabled.
+     */
+    public boolean isDanmakuEnabled() {
+        return danmakuEnabled;
+    }
+
+    /**
+     * Release danmaku resources.
+     */
+    public void releaseDanmaku() {
+        if (danmakuManager != null) {
+            danmakuManager.release();
+            danmakuManager = null;
+        }
+        danmakuParser = null;
+        danmakuEnabled = false;
     }
 }

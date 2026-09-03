@@ -112,6 +112,7 @@ tasks.register("versionTxt") {
 
 dependencies {
 	// Jellyfin
+	implementation(projects.danmaku)
 	implementation(projects.design)
 	implementation(projects.playback.core)
 	implementation(projects.playback.jellyfin)
