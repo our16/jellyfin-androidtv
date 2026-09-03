@@ -42,6 +42,7 @@ import org.jellyfin.androidtv.ui.playback.overlay.action.SelectAudioAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.SelectQualityAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.SkipNextAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.SkipPreviousAction;
+import org.jellyfin.androidtv.ui.playback.overlay.action.DanmakuToggleAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.ZoomAction;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
 import org.koin.java.KoinJavaComponent;
@@ -63,6 +64,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
     private PlaybackSpeedAction playbackSpeedAction;
     private ZoomAction zoomAction;
     private ChapterAction chapterAction;
+    private DanmakuToggleAction danmakuToggleAction;
 
     // TV actions
     private PreviousLiveTvChannelAction previousLiveTvChannelAction;
@@ -204,6 +206,8 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         zoomAction.setLabels(new String[]{context.getString(R.string.lbl_zoom)});
         chapterAction = new ChapterAction(context, this);
         chapterAction.setLabels(new String[]{context.getString(R.string.lbl_chapters)});
+        danmakuToggleAction = new DanmakuToggleAction(context, this);
+        danmakuToggleAction.setLabels(new String[]{context.getString(R.string.lbl_danmaku)});
 
         previousLiveTvChannelAction = new PreviousLiveTvChannelAction(context, this);
         previousLiveTvChannelAction.setLabels(new String[]{context.getString(R.string.lbl_prev_item)});
@@ -283,6 +287,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         }
 
         secondaryActionsAdapter.add(zoomAction);
+        secondaryActionsAdapter.add(danmakuToggleAction);
     }
 
     @Override
@@ -349,6 +354,16 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
             recordAction.setIndex(RecordAction.INDEX_INACTIVE);
         }
         notifyActionChanged(recordAction);
+    }
+
+    void danmakuStateChanged() {
+        PlaybackController controller = getPlayerAdapter().getPlaybackController();
+        if (controller != null && controller.isDanmakuVisible()) {
+            danmakuToggleAction.setIndex(DanmakuToggleAction.INDEX_ON);
+        } else {
+            danmakuToggleAction.setIndex(DanmakuToggleAction.INDEX_OFF);
+        }
+        notifyActionChanged(danmakuToggleAction);
     }
 
     void updatePlayState() {

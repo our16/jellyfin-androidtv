@@ -1359,6 +1359,24 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mVideoManager.setZoom(mode);
     }
 
+    public void toggleDanmaku() {
+        if (hasInitializedVideoManager())
+            mVideoManager.toggleDanmaku();
+    }
+
+    public boolean isDanmakuVisible() {
+        return hasInitializedVideoManager() && mVideoManager.isDanmakuVisible();
+    }
+
+    public boolean isDanmakuEnabled() {
+        return hasInitializedVideoManager() && mVideoManager.isDanmakuEnabled();
+    }
+
+    public void loadDanmaku(String xmlData) {
+        if (hasInitializedVideoManager())
+            mVideoManager.loadDanmaku(xmlData);
+    }
+
     /**
      * List of various states that we can be in
      */

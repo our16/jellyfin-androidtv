@@ -185,6 +185,7 @@
     <string name="desc_bitstream_ac3">Requires capable hardware</string>
     <string name="desc_audio_night_mode">Levels out audio volume automatically</string>
     <string name="lbl_zoom">Zoom</string>
+    <string name="lbl_danmaku">Danmaku</string>
     <string name="playback_info">Playback info</string>
     <string name="playback_info_play_method">Play method: %1$s</string>
     <string name="playback_info_direct_play">Directplay</string>
