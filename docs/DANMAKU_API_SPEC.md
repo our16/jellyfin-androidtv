@@ -1,8 +1,29 @@
 # Jellyfin Danmaku API Specification
 
-> 版本: 1.0.0  
-> 状态: 设计稿  
+> 版本: 1.1.0  
+> 状态: 已实现（服务端已部署并通过端到端验证）  
 > 兼容: jellyfin-plugin-danmu (cxfksword) + 弹弹play 接口规范
+
+## 实现状态 (v1.1.0)
+
+| 接口 | 状态 | 说明 |
+|------|------|------|
+| `GET /api/danmaku/{itemId}` | ✅ 已验证 | 缓存命中返回 `hasDanmaku:true` + 真实 `danmakuCount`；未命中 404 `DanmakuNotFound` |
+| `GET /api/danmaku/{itemId}/url` | ✅ 已验证 | 响应字段已修正为 camelCase（`url`/`expiresAt`/`format`/`fileSize`） |
+| `GET /api/danmaku/{itemId}/raw` | ✅ 已验证 | `application/xml`，返回标准 Bilibili XML |
+| `GET /api/danmaku/{itemId}/danmaku.{format}` | ✅ 已验证 | 直接下载缓存文件 |
+| `POST /api/danmaku/{itemId}/refresh` | ✅ 已实现 | 依赖条目名自动匹配，日期命名的条目（如 `20150425期.HDTV`）匹配率低，建议客户端用 5.2 搜索接口做手动绑定 |
+| `GET /api/danmaku/search` | ✅ 已验证 | Bilibili 搜索正常（服务端直连，无需代理） |
+| `GET /api/danmaku/search/by-item/{itemId}` | ✅ 已实现 | 按条目名搜索 |
+| `GET /api/danmaku/config` / `PUT` | ✅ 已验证 | 默认 `autoMatch:true`，源 `["bilibili","dandanplay"]` |
+| `GET /api/danmaku/sources` | ✅ 已验证 | 返回 local(禁用)/bilibili/dandanplay |
+| 缓存管理接口 (8.x) | ✅ 已实现 | 缓存目录 `{DataPath}/danmaku-cache/`，文件名 `{itemId}.{xml\|json}`，索引 `cache-index.json`（camelCase 字段） |
+| `GET /api/danmaku/{itemId}/protobuf` (4.4) | ❌ 未实现 | 设计稿保留，当前仅 xml/json |
+| 弹弹play 兼容接口 (5.3) | ✅ 已实现 | `/api/v2/search/anime` 等 |
+
+**itemId 格式**：路由参数接受带/不带连字符的 Guid；服务端缓存键为 **带连字符** 的 `Guid.ToString()` 格式（如 `2ef335bb-22cc-9727-f8df-ecc1f897e9f7`）。
+
+**响应大小写**：所有 DTO 已通过 `[JsonPropertyName]` 显式声明 camelCase 字段名，客户端按本文档字段名解析即可。
 
 ---
 
@@ -1490,6 +1511,7 @@ suspend fun fetchDanmakuWithFallback(
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | 1.0.0 | 2026-09-04 | 初始版本 |
+| 1.1.0 | 2026-09-06 | 服务端实现并端到端验证；`/url` 响应字段修正为 camelCase；`info` 缓存分支返回真实弹幕数；明确缓存目录布局与 itemId 格式；protobuf 端点标记未实现 |
 
 ---
 
