@@ -63,7 +63,8 @@ class PlaybackLauncher(
 				val destination = Destinations.videoPlayerNew(position)
 				navigationRepository.navigate(destination, replace)
 			} else {
-				val destination = Destinations.videoPlayer(position)
+				// Bilibili style player is the default playback experience
+				val destination = Destinations.bilibiliPlayer(position)
 				navigationRepository.navigate(destination, replace)
 			}
 		}

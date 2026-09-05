@@ -139,6 +139,10 @@ object Destinations {
 		putInt(VideoPlayerFragment.EXTRA_POSITION, position ?: 0)
 	}
 
+	fun bilibiliPlayer(position: Int?) = fragmentDestination<org.jellyfin.androidtv.ui.player.bilibili.BilibiliPlayerFragment> {
+		putInt(org.jellyfin.androidtv.ui.player.bilibili.BilibiliPlayerFragment.EXTRA_POSITION, position ?: 0)
+	}
+
 	fun nextUp(item: UUID) = fragmentDestination<NextUpFragment> {
 		putString(NextUpFragment.ARGUMENT_ITEM_ID, item.toString())
 	}

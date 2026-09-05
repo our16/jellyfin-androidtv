@@ -201,6 +201,9 @@ val appModule = module {
 	single { KeyProcessor() }
 	single { ReportingHelper(get(), get()) }
 	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
+	single<org.jellyfin.androidtv.data.repository.danmaku.DanmakuApiRepository> {
+		org.jellyfin.androidtv.data.repository.danmaku.DanmakuApiRepositoryImpl(get())
+	}
 
 	factory { (context: Context) -> SearchFragmentDelegate(context, get(), get()) }
 

@@ -174,11 +174,16 @@ public class ItemLauncher {
                     navigationRepository.getValue().navigate(Destinations.INSTANCE.libraryBrowser(baseItem, null));
                 } else if (baseItem.getType() == BaseItemKind.EPISODE) {
                     // Episodes play directly without showing details page
+                    final BaseItemDto episodeItem = baseItem;
                     playbackHelper.getValue().getItemsToPlay(context, baseItem, false, false, new Response<List<BaseItemDto>>() {
                         @Override
                         public void onResponse(List<BaseItemDto> response) {
                             if (!isActive()) return;
-                            playbackLauncher.getValue().launch(context, response);
+                            // Resume the clicked episode from its saved position
+                            long positionTicks = episodeItem.getUserData() != null ? episodeItem.getUserData().getPlaybackPositionTicks() : 0;
+                            int startPos = (int) (positionTicks / 10000);
+                            if (startPos > 0) startPos = Math.max(0, startPos - 30000);
+                            playbackLauncher.getValue().launch(context, response, startPos, false, 0);
                         }
                     });
                 } else {
