@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.playback.overlay.action
 
 import android.content.Context
 import android.view.View
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.playback.PlaybackController
@@ -29,6 +30,11 @@ class DanmakuToggleAction(
 		context: Context,
 		view: View,
 	) {
+		if (!playbackController.isDanmakuEnabled) {
+			Toast.makeText(context, R.string.msg_danmaku_not_loaded, Toast.LENGTH_SHORT).show()
+			return
+		}
+
 		playbackController.toggleDanmaku()
 		this.index = if (playbackController.isDanmakuVisible) INDEX_ON else INDEX_OFF
 	}

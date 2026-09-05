@@ -331,7 +331,10 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         chapterAction = new ChapterAction(context, this);
         chapterAction.setLabels(new String[]{context.getString(R.string.lbl_chapters)});
         danmakuToggleAction = new DanmakuToggleAction(context, this);
-        danmakuToggleAction.setLabels(new String[]{context.getString(R.string.lbl_danmaku)});
+        // MultiAction.setIndex() indexes into mLabels as well as mDrawables,
+        // so the labels array must have one entry per state (off/on)
+        String danmakuLabel = context.getString(R.string.lbl_danmaku);
+        danmakuToggleAction.setLabels(new String[]{danmakuLabel, danmakuLabel});
 
         previousLiveTvChannelAction = new PreviousLiveTvChannelAction(context, this);
         previousLiveTvChannelAction.setLabels(new String[]{context.getString(R.string.lbl_prev_item)});
