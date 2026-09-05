@@ -47,6 +47,8 @@ import org.jellyfin.androidtv.ui.playback.overlay.action.ZoomAction;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
 import org.koin.java.KoinJavaComponent;
 
+import timber.log.Timber;
+
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -85,6 +87,17 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
 
     private LinearLayout mButtonRef;
 
+    // Seekbar scrubbing auto-commit: seek is applied automatically after a short idle,
+    // instead of requiring an OK/Enter confirmation press
+    private static final long AUTO_COMMIT_SEEK_DELAY_MS = 700;
+    private View mSeekBar;
+    private Object mTransportViewHolder;
+    private java.lang.reflect.Method mOnForwardMethod;
+    private java.lang.reflect.Method mOnBackwardMethod;
+    private java.lang.reflect.Method mStopSeekMethod;
+    private java.lang.reflect.Field mInSeekField;
+    private final Runnable mAutoCommitSeekRunnable = this::autoCommitSeek;
+
     CustomPlaybackTransportControlGlue(Context context, VideoPlayerAdapter playerAdapter, PlaybackController playbackController) {
         super(context, playerAdapter);
         this.playbackController = playbackController;
@@ -110,6 +123,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
     protected void onDetachedFromHost() {
         mHandler.removeCallbacks(mRefreshEndTime);
         mHandler.removeCallbacks(mRefreshViewVisibility);
+        mHandler.removeCallbacks(mAutoCommitSeekRunnable);
 
         closedCaptionsAction.removePopup();
         playbackSpeedAction.dismissPopup();
@@ -132,6 +146,8 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
             @Override
             protected RowPresenter.ViewHolder createRowViewHolder(ViewGroup parent) {
                 RowPresenter.ViewHolder vh = super.createRowViewHolder(parent);
+
+                setupSeekAutoCommit(vh);
 
                 ClockBehavior showClock = KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getClockBehavior());
 
@@ -186,6 +202,114 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         };
         rowPresenter.setDescriptionPresenter(detailsPresenter);
         return rowPresenter;
+    }
+
+    /**
+     * Replaces the leanback seekbar key handling so that scrubbing auto-commits
+     * after a short idle period. Stock leanback requires pressing OK/Enter to
+     * confirm the seek, which pauses playback until the user confirms.
+     */
+    private void setupSeekAutoCommit(RowPresenter.ViewHolder vh) {
+        try {
+            Class<?> cls = vh.getClass();
+            java.lang.reflect.Field progressBarField = cls.getDeclaredField("mProgressBar");
+            progressBarField.setAccessible(true);
+            mSeekBar = (View) progressBarField.get(vh);
+
+            mTransportViewHolder = vh;
+            mOnForwardMethod = cls.getDeclaredMethod("onForward");
+            mOnForwardMethod.setAccessible(true);
+            mOnBackwardMethod = cls.getDeclaredMethod("onBackward");
+            mOnBackwardMethod.setAccessible(true);
+            mStopSeekMethod = cls.getDeclaredMethod("stopSeek", boolean.class);
+            mStopSeekMethod.setAccessible(true);
+            mInSeekField = cls.getDeclaredField("mInSeek");
+            mInSeekField.setAccessible(true);
+
+            mSeekBar.setOnKeyListener((v, keyCode, event) -> handleSeekKeyEvent(keyCode, event));
+        } catch (Exception e) {
+            Timber.e(e, "Failed to setup seekbar auto-commit");
+        }
+    }
+
+    private boolean handleSeekKeyEvent(int keyCode, KeyEvent event) {
+        int action = event.getAction();
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            case KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD:
+                if (action == KeyEvent.ACTION_DOWN || event.getRepeatCount() > 0) {
+                    invokeSeekStep(false);
+                }
+                return true;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            case KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD:
+                if (action == KeyEvent.ACTION_DOWN || event.getRepeatCount() > 0) {
+                    invokeSeekStep(true);
+                }
+                return true;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+                mHandler.removeCallbacks(mAutoCommitSeekRunnable);
+                if (isInSeek() && action == KeyEvent.ACTION_UP) {
+                    stopSeek(false);
+                    return true;
+                }
+                return isInSeek();
+            case KeyEvent.KEYCODE_BACK:
+            case KeyEvent.KEYCODE_ESCAPE:
+                mHandler.removeCallbacks(mAutoCommitSeekRunnable);
+                if (isInSeek() && action == KeyEvent.ACTION_UP) {
+                    stopSeek(true);
+                    return true;
+                }
+                return isInSeek();
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                // Leaving the seekbar: commit the seek and let focus navigation proceed
+                if (isInSeek()) {
+                    mHandler.removeCallbacks(mAutoCommitSeekRunnable);
+                    stopSeek(false);
+                }
+                return false;
+            default:
+                return false;
+        }
+    }
+
+    private void invokeSeekStep(boolean forward) {
+        try {
+            Boolean stepped = (Boolean) (forward ? mOnForwardMethod.invoke(mTransportViewHolder)
+                    : mOnBackwardMethod.invoke(mTransportViewHolder));
+            if (Boolean.TRUE.equals(stepped)) {
+                mHandler.removeCallbacks(mAutoCommitSeekRunnable);
+                mHandler.postDelayed(mAutoCommitSeekRunnable, AUTO_COMMIT_SEEK_DELAY_MS);
+            }
+        } catch (Exception e) {
+            Timber.e(e, "Seek step failed");
+        }
+    }
+
+    private void autoCommitSeek() {
+        if (isInSeek()) stopSeek(false);
+    }
+
+    private boolean isInSeek() {
+        if (mInSeekField == null || mTransportViewHolder == null) return false;
+        try {
+            return mInSeekField.getBoolean(mTransportViewHolder);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void stopSeek(boolean cancelled) {
+        try {
+            mStopSeekMethod.invoke(mTransportViewHolder, cancelled);
+        } catch (Exception e) {
+            Timber.e(e, "Stop seek failed");
+        }
     }
 
     private void initActions(Context context) {

@@ -84,7 +84,28 @@ public class ItemLauncher {
                         return;
                     case SERIES:
                     case MUSIC_ARTIST:
-                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(baseItem.getId()));
+                        if (baseItem.getType() == BaseItemKind.SERIES) {
+                            // Play the series directly (starting from next up episode) instead of showing the details page
+                            playbackHelper.getValue().getItemsToPlay(context, baseItem, false, false, new Response<List<BaseItemDto>>() {
+                                @Override
+                                public void onResponse(List<BaseItemDto> response) {
+                                    if (!isActive()) return;
+                                    if (response.isEmpty()) {
+                                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(baseItem.getId()));
+                                        return;
+                                    }
+                                    // Resume the first episode from its saved position
+                                    BaseItemDto firstEpisode = response.get(0);
+                                    long positionTicks = firstEpisode.getUserData() != null && firstEpisode.getUserData().getPlaybackPositionTicks() != null
+                                            ? firstEpisode.getUserData().getPlaybackPositionTicks() : 0;
+                                    int startPos = (int) (positionTicks / 10000);
+                                    if (startPos > 0) startPos = Math.max(0, startPos - 30000); // 30s resume preroll
+                                    playbackLauncher.getValue().launch(context, response, startPos, false, 0);
+                                }
+                            });
+                        } else {
+                            navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(baseItem.getId()));
+                        }
                         return;
 
                     case MUSIC_ALBUM:

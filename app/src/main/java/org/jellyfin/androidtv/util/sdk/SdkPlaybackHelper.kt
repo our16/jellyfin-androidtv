@@ -90,14 +90,44 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.SERIES -> {
-				val response by api.tvShowsApi.getEpisodes(
-					seriesId = mainItem.id,
-					isMissing = false,
-					sortBy = if (shuffle) ItemSortBy.RANDOM else ItemSortBy.SORT_NAME,
-					limit = ITEM_QUERY_LIMIT,
-					fields = ItemRepository.itemFields,
-				)
-				response.items
+				if (shuffle) {
+					val response by api.tvShowsApi.getEpisodes(
+						seriesId = mainItem.id,
+						isMissing = false,
+						sortBy = ItemSortBy.RANDOM,
+						limit = ITEM_QUERY_LIMIT,
+						fields = ItemRepository.itemFields,
+					)
+					response.items
+				} else {
+					// Play directly from the next up episode (resume/first unwatched)
+					val nextUp = api.tvShowsApi.getNextUp(
+						seriesId = mainItem.id,
+						fields = ItemRepository.itemFields,
+						limit = 1,
+					).content.items.firstOrNull()
+
+					if (nextUp != null) {
+						val response by api.tvShowsApi.getEpisodes(
+							seriesId = mainItem.id,
+							startItemId = nextUp.id,
+							isMissing = false,
+							limit = ITEM_QUERY_LIMIT,
+							fields = ItemRepository.itemFields,
+						)
+						response.items
+					} else {
+						// Nothing in progress: fall back to the first episode
+						val response by api.tvShowsApi.getEpisodes(
+							seriesId = mainItem.id,
+							isMissing = false,
+							sortBy = ItemSortBy.SORT_NAME,
+							limit = ITEM_QUERY_LIMIT,
+							fields = ItemRepository.itemFields,
+						)
+						response.items
+					}
+				}
 			}
 
 			BaseItemKind.SEASON -> {
