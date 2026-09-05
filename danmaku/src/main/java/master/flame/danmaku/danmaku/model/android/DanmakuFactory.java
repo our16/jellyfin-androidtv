@@ -96,7 +96,13 @@ public class DanmakuFactory {
             return null;
         sLastConfig = context;
         sLastDisp = context.getDisplayer();
-        return createDanmaku(type, sLastDisp.getWidth(), sLastDisp.getHeight(), CURRENT_DISP_SIZE_FACTOR, context.scrollSpeedFactor);
+        BaseDanmaku danmaku = createDanmaku(type, sLastDisp.getWidth(), sLastDisp.getHeight(), CURRENT_DISP_SIZE_FACTOR, context.scrollSpeedFactor);
+        if (danmaku != null) {
+            // Without the global flag values every BaseDanmaku.hasPassedFilter()
+            // dereferences a null flags field and crashes the cache-building thread.
+            danmaku.flags = context.mGlobalFlagValues;
+        }
+        return danmaku;
     }
 
     public BaseDanmaku createDanmaku(int type, IDisplayer disp, float viewportScale, float scrollSpeedFactor) {
