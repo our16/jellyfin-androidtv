@@ -30,6 +30,9 @@ class DanmakuManager(private val activity: Activity) {
     private var pendingStartOnPrepared = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** Optional diagnostic callback invoked (on the main thread) once the engine is prepared. */
+    var onEnginePrepared: (() -> Unit)? = null
+
     /**
      * Initialize the danmaku view with default TV-optimized configuration.
      */
@@ -69,6 +72,7 @@ class DanmakuManager(private val activity: Activity) {
         view.setCallback(object : DrawHandler.Callback {
             override fun prepared() {
                 Timber.d("Danmaku engine prepared, starting at %d", pendingStartPosition)
+                mainHandler.post { onEnginePrepared?.invoke() }
                 if (pendingStartOnPrepared) {
                     view.start(pendingStartPosition)
                     if (!isVisible) view.hide()

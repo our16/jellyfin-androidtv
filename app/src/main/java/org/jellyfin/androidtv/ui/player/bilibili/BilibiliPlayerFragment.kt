@@ -591,6 +591,15 @@ class BilibiliPlayerFragment : Fragment() {
 
 	// Danmaku
 
+	private fun danmakuStatus(text: String) {
+		// Visible diagnostic: shows each danmaku loading stage on screen for 4s
+		seekHintState = "弹幕：$text"
+		seekHintRunnable?.let { handler.removeCallbacks(it) }
+		val runnable = Runnable { if (seekHintState == "弹幕：$text") seekHintState = null }
+		seekHintRunnable = runnable
+		handler.postDelayed(runnable, 4000)
+	}
+
 	private fun resetDanmaku() {
 		danmakuManager?.release()
 		danmakuManager = null
@@ -605,14 +614,17 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuView
 			} ?: run {
 				Timber.w("Danmaku view not available in time")
+				danmakuStatus("视图未就绪（5s 超时）")
 				return@launch
 			}
 
+			danmakuStatus("获取数据…")
 			var xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
 
 			if (xml.isNullOrBlank()) {
 				// No cached danmaku on the server: request an auto-match and poll for it
 				Timber.d("No cached danmaku for %s, requesting refresh", item.name)
+				danmakuStatus("服务器无缓存，请求匹配…")
 				runCatching { danmakuApi.refreshDanmaku(item.id.toString(), force = true) }
 				repeat(10) {
 					delay(3000)
@@ -626,12 +638,17 @@ class BilibiliPlayerFragment : Fragment() {
 
 			if (xml.isNullOrBlank()) {
 				Timber.d("No danmaku data for %s", item.name)
+				danmakuStatus("服务器无弹幕数据")
 				return@launch
 			}
+			danmakuStatus("已获取 ${xml.length / 1024}KB，解析中…")
 
 			try {
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)
+				manager.onEnginePrepared = {
+					danmakuStatus("引擎就绪，弹幕开始渲染")
+				}
 				val parser = JellyfinDanmakuParser()
 				val dataSource = DanmakuDataSource()
 				dataSource.loadFromString(xml)
@@ -640,9 +657,11 @@ class BilibiliPlayerFragment : Fragment() {
 				manager.loadDanmaku(parser, player?.currentPosition ?: 0)
 				danmakuManager = manager
 				danmakuLoadedState = true
+				danmakuStatus("引擎加载完成")
 				Timber.d("Danmaku loaded for %s", item.name)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to load danmaku")
+				danmakuStatus("加载失败：${e.message}")
 			}
 		}
 	}
