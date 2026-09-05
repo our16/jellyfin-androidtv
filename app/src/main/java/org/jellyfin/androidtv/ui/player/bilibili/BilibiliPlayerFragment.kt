@@ -113,6 +113,9 @@ class BilibiliPlayerFragment : Fragment() {
 	private var exiting = false
 	private var screensaverLock: (() -> Unit)? = null
 
+	// Playback failure fallback: direct play -> direct stream -> forced transcode
+	private var playbackRetryCount = 0
+
 	override fun onCreateView(
 		inflater: LayoutInflater,
 		container: ViewGroup?,
@@ -214,6 +217,10 @@ class BilibiliPlayerFragment : Fragment() {
 						isBufferingState = playbackState == Player.STATE_BUFFERING
 						if (playbackState == Player.STATE_READY) {
 							seekTargetMs = -1
+							playbackRetryCount = 0
+							if (seekHintState?.startsWith("直连") == true || seekHintState?.startsWith("切换") == true) {
+								seekHintState = null
+							}
 						}
 						if (playbackState == Player.STATE_ENDED) {
 							onItemEnded()
@@ -222,7 +229,8 @@ class BilibiliPlayerFragment : Fragment() {
 					}
 
 					override fun onPlayerError(error: PlaybackException) {
-						Timber.e(error, "BilibiliPlayer playback error")
+						Timber.e(error, "BilibiliPlayer playback error (code=%s)", error.errorCodeName)
+						onPlaybackError(error)
 					}
 				})
 			}
@@ -304,6 +312,7 @@ class BilibiliPlayerFragment : Fragment() {
 		startPositionMs = startMs
 		seekTargetMs = startMs
 		positionState = startMs
+		playbackRetryCount = 0
 		danmakuLoadedState = false
 		danmakuVisibleState = true
 		hasNextState = index < queue.size - 1
@@ -451,6 +460,60 @@ class BilibiliPlayerFragment : Fragment() {
 	}
 
 	// Queue navigation
+
+	/**
+	 * Automatic playback failure fallback, mirroring the legacy controller strategy:
+	 * 1st failure: disable direct play (keep direct stream)
+	 * 2nd failure: disable direct stream (server-side transcode)
+	 * 3rd failure: give up with a visible error message
+	 */
+	private fun onPlaybackError(error: PlaybackException) {
+		val item = currentItem ?: return
+		if (exiting) return
+
+		val positionMs = player?.currentPosition?.coerceAtLeast(0) ?: 0
+		when (playbackRetryCount) {
+			0 -> {
+				playbackRetryCount = 1
+				seekHintState = "直连播放失败，切换流媒体重试…"
+				rebuildStream(item, positionMs, directPlay = false, directStream = true)
+			}
+			1 -> {
+				playbackRetryCount = 2
+				seekHintState = "切换转码播放…"
+				rebuildStream(item, positionMs, directPlay = false, directStream = false)
+			}
+			else -> {
+				seekHintState = "无法播放该视频（错误: ${error.errorCodeName}）"
+				handler.postDelayed({ if (seekHintState?.startsWith("无法播放") == true) seekHintState = null }, 4000)
+				Toast.makeText(requireContext(), R.string.msg_video_playback_error, Toast.LENGTH_LONG).show()
+			}
+		}
+	}
+
+	private fun rebuildStream(item: BaseItemDto, positionMs: Long, directPlay: Boolean, directStream: Boolean) {
+		viewLifecycleOwner.lifecycleScope.launch {
+			try {
+				val options = buildOptions(item).apply {
+					enableDirectPlay = directPlay
+					enableDirectStream = directStream
+				}
+				currentOptions = options
+				val stream = resolveStream(options, positionMs * 10_000)
+				currentStreamInfo = stream
+
+				val p = player ?: return@launch
+				p.setMediaItem(MediaItem.fromUri(stream.mediaUrl), positionMs)
+				p.prepare()
+				p.play()
+				Timber.i("Playback retry with directPlay=%s directStream=%s playMethod=%s", directPlay, directStream, stream.playMethod)
+			} catch (e: Exception) {
+				Timber.e(e, "Playback retry failed")
+				seekHintState = "播放失败：${e.message}"
+				Toast.makeText(requireContext(), R.string.msg_video_playback_error, Toast.LENGTH_LONG).show()
+			}
+		}
+	}
 
 	private fun playNext() {
 		if (currentItemIndex < videoQueueManager.getCurrentVideoQueue().size - 1) {
