@@ -148,7 +148,12 @@ class BilibiliPlayerFragment : Fragment() {
 			AndroidView(
 				modifier = Modifier.fillMaxSize(),
 				factory = { ctx ->
-					DanmakuTextureView(ctx).also { danmakuView = it }
+					DanmakuTextureView(ctx).also {
+						// SurfaceTexture creation happens in draw(); DFM sets willNotDraw(true)
+						// which blocks it. Force it off so onSurfaceTextureAvailable fires.
+						it.setWillNotDraw(false)
+						danmakuView = it
+					}
 				}
 			)
 			BilibiliPlayerControls(

@@ -90,10 +90,13 @@ public class DanmakuTextureView extends TextureView implements IDanmakuView, IDa
         setOpaque(false);
         setWillNotCacheDrawing(true);
         setDrawingCacheEnabled(false);
-        setWillNotDraw(true);
+        // MUST be false: TextureView creates its SurfaceTexture inside draw().
+        // With PFLAG_SKIP_DRAW set, draw() is skipped, onSurfaceTextureAvailable
+        // never fires and the danmaku engine waits for the surface forever.
+        setWillNotDraw(false);
         setSurfaceTextureListener(this);
         DrawHelper.useDrawColorToClearCanvas(true, true);
-		mTouchHelper = DanmakuTouchHelper.instance(this);    
+		mTouchHelper = DanmakuTouchHelper.instance(this);
 	}
 
     public DanmakuTextureView(Context context, AttributeSet attrs) {
