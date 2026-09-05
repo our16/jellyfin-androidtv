@@ -922,6 +922,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         mSeekPosition = -1;
         finishedInitialSeek = false;
         wasSeeking = false;
+        mHandler.removeCallbacks(wasSeekingResetRunnable);
         burningSubs = false;
         mCurrentStreamInfo = null;
     }
@@ -977,14 +978,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         if (wasSeeking) {
-            Timber.d("Previous seek has not finished - cancelling seek from %s to %d", mCurrentPosition, pos);
-            if (isPaused()) {
-                refreshCurrentPosition();
-                play(mCurrentPosition);
-            }
-            return;
+            Timber.d("Previous seek has not finished - force completing and seeking from %s to %d", mCurrentPosition, pos);
+            wasSeeking = false;
         }
         wasSeeking = true;
+        // Safety timeout: clear wasSeeking if progress listener doesn't fire (e.g. during buffering)
+        mHandler.removeCallbacks(wasSeekingResetRunnable);
+        mHandler.postDelayed(wasSeekingResetRunnable, 5000);
 
         // Stop playback when the requested seek position is at the end of the video
         if (skipToNext && pos >= (getDuration() - 100)) {
@@ -1058,6 +1058,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     private long currentSkipPos = 0;
+
+    // Safety timeout to clear wasSeeking if progress listener doesn't fire
+    private final Runnable wasSeekingResetRunnable = () -> {
+        if (wasSeeking) {
+            Timber.w("wasSeeking stuck for too long - force resetting");
+            wasSeeking = false;
+        }
+    };
+
     private final Runnable skipRunnable = () -> {
         if (!(isPlaying() || isPaused())) return; // in case we completed since this was requested
 
