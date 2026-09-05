@@ -468,32 +468,26 @@ class BilibiliPlayerFragment : Fragment() {
 	// Queue navigation
 
 	/**
-	 * Automatic playback failure fallback, mirroring the legacy controller strategy:
-	 * 1st failure: disable direct play (keep direct stream)
-	 * 2nd failure: disable direct stream (server-side transcode)
-	 * 3rd failure: give up with a visible error message
+	 * Automatic playback failure fallback:
+	 * 1st failure: force server-side transcode (real-time encode).
+	 * We intentionally skip the copy-remux (direct stream) level: for MKVs with a
+	 * broken/missing Cues index the server remuxes the whole file in seconds, then
+	 * deletes the HLS playlist before a slow TV client ever fetches it.
+	 * Real-time transcoding keeps the job (and the playlist) alive.
 	 */
 	private fun onPlaybackError(error: PlaybackException) {
 		val item = currentItem ?: return
 		if (exiting) return
 
 		val positionMs = player?.currentPosition?.coerceAtLeast(0) ?: 0
-		when (playbackRetryCount) {
-			0 -> {
-				playbackRetryCount = 1
-				seekHintState = "直连播放失败，切换流媒体重试…"
-				rebuildStream(item, positionMs, directPlay = false, directStream = true)
-			}
-			1 -> {
-				playbackRetryCount = 2
-				seekHintState = "切换转码播放…"
-				rebuildStream(item, positionMs, directPlay = false, directStream = false)
-			}
-			else -> {
-				seekHintState = "无法播放该视频（错误: ${error.errorCodeName}）"
-				handler.postDelayed({ if (seekHintState?.startsWith("无法播放") == true) seekHintState = null }, 4000)
-				Toast.makeText(requireContext(), R.string.msg_video_playback_error, Toast.LENGTH_LONG).show()
-			}
+		if (playbackRetryCount == 0) {
+			playbackRetryCount = 1
+			seekHintState = "直连播放失败，切换服务器转码…"
+			rebuildStream(item, positionMs, directPlay = false, directStream = false)
+		} else {
+			seekHintState = "无法播放该视频（错误: ${error.errorCodeName}）"
+			handler.postDelayed({ if (seekHintState?.startsWith("无法播放") == true) seekHintState = null }, 4000)
+			Toast.makeText(requireContext(), R.string.msg_video_playback_error, Toast.LENGTH_LONG).show()
 		}
 	}
 
