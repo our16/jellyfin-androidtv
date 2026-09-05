@@ -545,11 +545,27 @@ class BilibiliPlayerFragment : Fragment() {
 				return@launch
 			}
 
-			val xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
+			var xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
+
+			if (xml.isNullOrBlank()) {
+				// No cached danmaku on the server: request an auto-match and poll for it
+				Timber.d("No cached danmaku for %s, requesting refresh", item.name)
+				runCatching { danmakuApi.refreshDanmaku(item.id.toString(), force = true) }
+				repeat(10) {
+					delay(3000)
+					val info = runCatching { danmakuApi.getDanmakuInfo(item.id.toString()) }.getOrNull()
+					if (info?.hasDanmaku == true) {
+						xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
+					}
+					if (!xml.isNullOrBlank()) return@repeat
+				}
+			}
+
 			if (xml.isNullOrBlank()) {
 				Timber.d("No danmaku data for %s", item.name)
 				return@launch
 			}
+
 			try {
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)

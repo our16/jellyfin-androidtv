@@ -119,7 +119,7 @@ class DanmakuApiRepositoryImpl(
         }
     }
 
-    private fun baseUrl(): String = api.baseUrl ?: ""
+    private fun baseUrl(): String = api.baseUrl?.trimEnd('/') ?: ""
 
     override suspend fun getDanmakuInfo(
         itemId: String,
