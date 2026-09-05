@@ -86,18 +86,21 @@ public class ItemLauncher {
                     case MUSIC_ARTIST:
                         if (baseItem.getType() == BaseItemKind.SERIES) {
                             // Play the series directly (starting from next up episode) instead of showing the details page
+                            final BaseItemDto seriesItem = baseItem;
                             playbackHelper.getValue().getItemsToPlay(context, baseItem, false, false, new Response<List<BaseItemDto>>() {
                                 @Override
                                 public void onResponse(List<BaseItemDto> response) {
                                     if (!isActive()) return;
                                     if (response.isEmpty()) {
-                                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(baseItem.getId()));
+                                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(seriesItem.getId()));
                                         return;
                                     }
                                     // Resume the first episode from its saved position
                                     BaseItemDto firstEpisode = response.get(0);
-                                    long positionTicks = firstEpisode.getUserData() != null && firstEpisode.getUserData().getPlaybackPositionTicks() != null
-                                            ? firstEpisode.getUserData().getPlaybackPositionTicks() : 0;
+                                    long positionTicks = 0;
+                                    if (firstEpisode.getUserData() != null) {
+                                        positionTicks = firstEpisode.getUserData().getPlaybackPositionTicks();
+                                    }
                                     int startPos = (int) (positionTicks / 10000);
                                     if (startPos > 0) startPos = Math.max(0, startPos - 30000); // 30s resume preroll
                                     playbackLauncher.getValue().launch(context, response, startPos, false, 0);
