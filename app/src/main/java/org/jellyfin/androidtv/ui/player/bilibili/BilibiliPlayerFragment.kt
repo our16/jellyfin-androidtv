@@ -30,6 +30,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import master.flame.danmaku.ui.widget.DanmakuTextureView
@@ -659,6 +660,25 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuLoadedState = true
 				danmakuStatus("引擎加载完成")
 				Timber.d("Danmaku loaded for %s", item.name)
+
+				// Live monitor: surface availability is the usual silent blocker
+				launch {
+					var last = ""
+					while (isActive && danmakuManager === manager) {
+						delay(600)
+						val ready = runCatching { view.isViewReady() }.getOrDefault(false)
+						val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
+						val state = when {
+							prepared -> "surface=OK engine=OK"
+							ready -> "surface=OK 引擎解析中…"
+							else -> "等待视图 surface…"
+						}
+						if (state != last) {
+							last = state
+							danmakuStatus(state)
+						}
+					}
+				}
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to load danmaku")
 				danmakuStatus("加载失败：${e.message}")
