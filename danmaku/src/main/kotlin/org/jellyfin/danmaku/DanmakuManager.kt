@@ -158,6 +158,11 @@ class DanmakuManager(private val activity: Activity) {
     fun isDanmakuVisible(): Boolean = isVisible
 
     /**
+     * Current danmaku engine timeline position in milliseconds.
+     */
+    fun getCurrentTime(): Long = danmakuView?.getCurrentTime() ?: 0L
+
+    /**
      * Add a single danmaku item (for live danmaku).
      */
     fun addDanmaku(item: BaseDanmaku) {

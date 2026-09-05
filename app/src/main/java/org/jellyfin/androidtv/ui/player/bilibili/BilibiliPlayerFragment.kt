@@ -646,20 +646,25 @@ class BilibiliPlayerFragment : Fragment() {
 			try {
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)
-				manager.onEnginePrepared = {
-					danmakuStatus("引擎就绪，弹幕开始渲染")
-				}
 				val parser = JellyfinDanmakuParser()
+				manager.onEnginePrepared = {
+					// Called on the main thread (posted) after the engine thread finished
+					// parsing - safe to query the danmaku set here.
+					val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
+					val engineTime = runCatching { manager.getCurrentTime() }.getOrDefault(-1)
+					danmakuStatus("引擎就绪 count=$count time=$engineTime")
+				}
 				val dataSource = DanmakuDataSource()
 				dataSource.loadFromString(xml)
 				parser.load(dataSource)
-				// The manager defers start() until the engine reports prepared()
+				// The manager defers start() until the engine reports prepared().
+				// NOTE: never call parser.getDanmakus() from the main thread - it races
+				// with the engine's own parse (shared input stream + releaseDataSource)
+				// and can leave the engine with an empty danmaku set.
 				manager.loadDanmaku(parser, player?.currentPosition ?: 0)
 				danmakuManager = manager
 				danmakuLoadedState = true
-				val parsedCount = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
-				danmakuStatus("解析出 $parsedCount 条")
-				Timber.d("Danmaku loaded for %s, parsed=%d", item.name, parsedCount)
+				Timber.d("Danmaku load requested for %s", item.name)
 
 				// Live monitor: surface availability is the usual silent blocker
 				launch {
@@ -669,8 +674,9 @@ class BilibiliPlayerFragment : Fragment() {
 						val ready = runCatching { view.isViewReady() }.getOrDefault(false)
 						val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
 						val diag = runCatching { view.renderDiag }.getOrDefault("")
+						val engineTime = runCatching { manager.getCurrentTime() }.getOrDefault(-1)
 						val state = when {
-							prepared -> "surface=OK engine=OK $diag"
+							prepared -> "surface=OK engine=OK time=$engineTime $diag"
 							ready -> "surface=OK 引擎解析中…"
 							else -> "等待视图 surface…"
 						}
