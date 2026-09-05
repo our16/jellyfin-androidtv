@@ -76,7 +76,10 @@ public class DanmakuTextureView extends TextureView implements IDanmakuView, IDa
     private boolean mShowFps;
 
     private boolean mDanmakuVisible = true;
-    
+
+    // Diagnostics: last frame's render counters (updated periodically, read by the player UI)
+    public volatile String renderDiag = "";
+
     protected int mDrawingThreadType = THREAD_TYPE_NORMAL_PRIORITY;
 
     public DanmakuTextureView(Context context) {
@@ -291,6 +294,11 @@ public class DanmakuTextureView extends TextureView implements IDanmakuView, IDa
         if (canvas != null) {
             if (handler != null) {
                 RenderingState rs = handler.draw(canvas);
+                if (rs != null) {
+                    renderDiag = "draw total=" + rs.totalDanmakuCount + " r2l=" + rs.r2lDanmakuCount;
+                } else {
+                    renderDiag = "draw rs=null";
+                }
                 if (mShowFps) {
                     if (mDrawTimes == null)
                         mDrawTimes = new LinkedList<Long>();

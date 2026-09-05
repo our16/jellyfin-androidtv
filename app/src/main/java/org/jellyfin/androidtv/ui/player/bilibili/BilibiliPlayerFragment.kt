@@ -657,8 +657,9 @@ class BilibiliPlayerFragment : Fragment() {
 				manager.loadDanmaku(parser, player?.currentPosition ?: 0)
 				danmakuManager = manager
 				danmakuLoadedState = true
-				danmakuStatus("引擎加载完成")
-				Timber.d("Danmaku loaded for %s", item.name)
+				val parsedCount = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
+				danmakuStatus("解析出 $parsedCount 条")
+				Timber.d("Danmaku loaded for %s, parsed=%d", item.name, parsedCount)
 
 				// Live monitor: surface availability is the usual silent blocker
 				launch {
@@ -667,8 +668,9 @@ class BilibiliPlayerFragment : Fragment() {
 						delay(600)
 						val ready = runCatching { view.isViewReady() }.getOrDefault(false)
 						val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
+						val diag = runCatching { view.renderDiag }.getOrDefault("")
 						val state = when {
-							prepared -> "surface=OK engine=OK"
+							prepared -> "surface=OK engine=OK $diag"
 							ready -> "surface=OK 引擎解析中…"
 							else -> "等待视图 surface…"
 						}
