@@ -1,10 +1,14 @@
 package org.jellyfin.danmaku
 
 import android.app.Activity
+import android.os.Handler
+import android.os.Looper
+import master.flame.danmaku.controller.DrawHandler
 import master.flame.danmaku.danmaku.model.BaseDanmaku
+import master.flame.danmaku.danmaku.model.DanmakuTimer
 import master.flame.danmaku.danmaku.model.android.DanmakuContext
-import master.flame.danmaku.danmaku.parser.BaseDanmakuParser
 import master.flame.danmaku.danmaku.model.IDisplayer
+import master.flame.danmaku.danmaku.parser.BaseDanmakuParser
 import master.flame.danmaku.ui.widget.DanmakuTextureView
 import timber.log.Timber
 
@@ -18,6 +22,13 @@ class DanmakuManager(private val activity: Activity) {
     private var danmakuContext: DanmakuContext? = null
     private var isPrepared = false
     private var isVisible = true
+
+    // DFM prepares asynchronously; start must happen after the prepared() callback
+    // otherwise DanmakuView.start() cancels the pending PREPARE message and the
+    // render task is never created.
+    private var pendingStartPosition = 0L
+    private var pendingStartOnPrepared = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
      * Initialize the danmaku view with default TV-optimized configuration.
@@ -37,36 +48,60 @@ class DanmakuManager(private val activity: Activity) {
             setScaleTextSize(1.2f)                    // Larger text for TV viewing distance
             setMaximumVisibleSizeInScreen(-1)          // Auto-adjust density
             setScrollSpeedFactor(1.2f)                 // Slightly faster for wider TV screens
-            
+
             // Style settings
             setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 3.5f) // Stroke for better readability
             setDanmakuBold(true)                       // Bold text for clarity
-            
-            // Performance settings
-            // Use Choreographer mode (default) for VSync sync
-            // updateMethod = 0 is default
         }
     }
 
     /**
      * Load danmaku data from a parser.
+     * Playback starts automatically once the engine reports it is prepared.
      */
-    fun loadDanmaku(parser: BaseDanmakuParser) {
+    @JvmOverloads
+    fun loadDanmaku(parser: BaseDanmakuParser, startPosition: Long = 0) {
         val view = danmakuView ?: return
         val context = danmakuContext ?: return
-        
+
+        pendingStartPosition = startPosition
+        pendingStartOnPrepared = true
+        view.setCallback(object : DrawHandler.Callback {
+            override fun prepared() {
+                Timber.d("Danmaku engine prepared, starting at %d", pendingStartPosition)
+                if (pendingStartOnPrepared) {
+                    view.start(pendingStartPosition)
+                    if (!isVisible) view.hide()
+                    pendingStartOnPrepared = false
+                }
+            }
+
+            override fun updateTimer(timer: DanmakuTimer?) = Unit
+
+            override fun danmakuShown(bae: BaseDanmaku?) = Unit
+
+            override fun drawingFinished() = Unit
+        })
         view.prepare(parser, context)
         isPrepared = true
-        Timber.d("Danmaku loaded")
+        Timber.d("Danmaku load requested")
     }
 
     /**
-     * Start danmaku playback.
+     * Start danmaku playback. Safe to call before the engine is prepared:
+     * the start is deferred until the prepared callback fires.
      */
+    @JvmOverloads
     fun start(position: Long = 0) {
-        if (!isPrepared) return
-        danmakuView?.start(position)
-        Timber.d("Danmaku started at position: $position")
+        val view = danmakuView ?: return
+        if (pendingStartOnPrepared) {
+            // start will happen in the prepared() callback with the latest position
+            pendingStartPosition = position
+            return
+        }
+        view.start(position)
+        if (!isVisible) view.hide()
+        Timber.d("Danmaku started at position: %d", position)
     }
 
     /**
@@ -81,7 +116,6 @@ class DanmakuManager(private val activity: Activity) {
      * Resume danmaku playback.
      */
     fun resume() {
-        if (!isPrepared) return
         danmakuView?.resume()
         Timber.d("Danmaku resumed")
     }
@@ -91,7 +125,7 @@ class DanmakuManager(private val activity: Activity) {
      */
     fun seekTo(position: Long) {
         danmakuView?.seekTo(position)
-        Timber.d("Danmaku seeked to: $position")
+        Timber.d("Danmaku seeked to: %d", position)
     }
 
     /**
@@ -104,7 +138,7 @@ class DanmakuManager(private val activity: Activity) {
         } else {
             danmakuView?.hide()
         }
-        Timber.d("Danmaku visibility: $visible")
+        Timber.d("Danmaku visibility: %b", visible)
     }
 
     /**
@@ -137,10 +171,12 @@ class DanmakuManager(private val activity: Activity) {
      * Release all resources.
      */
     fun release() {
+        mainHandler.removeCallbacksAndMessages(null)
         danmakuView?.release()
         danmakuView = null
         danmakuContext = null
         isPrepared = false
+        pendingStartOnPrepared = false
         Timber.d("DanmakuManager released")
     }
 
@@ -148,13 +184,4 @@ class DanmakuManager(private val activity: Activity) {
      * Get the current danmaku context for configuration changes.
      */
     fun getContext(): DanmakuContext? = danmakuContext
-
-    /**
-     * Update danmaku configuration.
-     */
-    fun updateConfig(block: DanmakuContext.() -> Unit) {
-        danmakuContext?.apply(block)
-        // Note: Some config changes require re-rendering
-        danmakuView?.forceRender()
-    }
 }

@@ -98,7 +98,8 @@ class JellyfinDanmakuParser : BaseDanmakuParser() {
             if (danmaku != null) {
                 danmaku.text = text
                 danmaku.setTime(time)
-                danmaku.textSize = fontSize
+                // Scale the raw font size by display density so it stays readable on TV screens
+                danmaku.textSize = fontSize * mDispDensity
                 danmaku.textColor = color
                 danmaku.textShadowColor = 0 // No shadow for now
                 

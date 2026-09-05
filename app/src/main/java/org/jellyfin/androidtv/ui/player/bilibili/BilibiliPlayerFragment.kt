@@ -31,6 +31,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import master.flame.danmaku.ui.widget.DanmakuTextureView
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.compat.StreamInfo
@@ -41,6 +42,7 @@ import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.playback.PlaybackManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.InteractionTrackerViewModel
 import org.jellyfin.androidtv.util.apiclient.ReportingHelper
 import org.jellyfin.androidtv.util.profile.createDeviceProfile
 import org.jellyfin.danmaku.DanmakuDataSource
@@ -75,6 +77,7 @@ class BilibiliPlayerFragment : Fragment() {
 	private val danmakuApi by inject<DanmakuApiRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val serverVersion by inject<ServerVersion>()
+	private val interactionTracker by inject<InteractionTrackerViewModel>()
 
 	private var player: ExoPlayer? = null
 	private var danmakuView: DanmakuTextureView? = null
@@ -108,6 +111,7 @@ class BilibiliPlayerFragment : Fragment() {
 	private var playerReady by mutableStateOf(false)
 
 	private var exiting = false
+	private var screensaverLock: (() -> Unit)? = null
 
 	override fun onCreateView(
 		inflater: LayoutInflater,
@@ -198,7 +202,12 @@ class BilibiliPlayerFragment : Fragment() {
 				exo.addListener(object : Player.Listener {
 					override fun onIsPlayingChanged(isPlaying: Boolean) {
 						isPlayingState = isPlaying
-						if (isPlaying) scheduleHideControls()
+						if (isPlaying) {
+							acquireScreensaverLock()
+							scheduleHideControls()
+						} else {
+							releaseScreensaverLock()
+						}
 					}
 
 					override fun onPlaybackStateChanged(playbackState: Int) {
@@ -402,6 +411,20 @@ class BilibiliPlayerFragment : Fragment() {
 
 	// Controls visibility
 
+	/**
+	 * Keeps the screen awake and prevents the in-app screensaver while playing.
+	 * Same mechanism the legacy player uses (InteractionTrackerViewModel locks).
+	 */
+	private fun acquireScreensaverLock() {
+		if (screensaverLock != null) return
+		screensaverLock = interactionTracker.addLifecycleLock(viewLifecycleOwner.lifecycle)
+	}
+
+	private fun releaseScreensaverLock() {
+		screensaverLock?.invoke()
+		screensaverLock = null
+	}
+
 	private fun showControls() {
 		controlsVisible = true
 		updatePositionState()
@@ -511,8 +534,17 @@ class BilibiliPlayerFragment : Fragment() {
 	}
 
 	private fun loadDanmaku(item: BaseItemDto) {
-		val view = danmakuView ?: return
 		viewLifecycleOwner.lifecycleScope.launch {
+			// The danmaku view is created inside a Compose AndroidView factory;
+			// wait until it exists before handing it to the danmaku engine
+			val view: DanmakuTextureView = withTimeoutOrNull(5000) {
+				while (danmakuView == null) delay(50)
+				danmakuView
+			} ?: run {
+				Timber.w("Danmaku view not available in time")
+				return@launch
+			}
+
 			val xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
 			if (xml.isNullOrBlank()) {
 				Timber.d("No danmaku data for %s", item.name)
@@ -525,14 +557,10 @@ class BilibiliPlayerFragment : Fragment() {
 				val dataSource = DanmakuDataSource()
 				dataSource.loadFromString(xml)
 				parser.load(dataSource)
-				manager.loadDanmaku(parser)
+				// The manager defers start() until the engine reports prepared()
+				manager.loadDanmaku(parser, player?.currentPosition ?: 0)
 				danmakuManager = manager
 				danmakuLoadedState = true
-				if (danmakuVisibleState) {
-					manager.start(player?.currentPosition ?: 0)
-				} else {
-					manager.setVisible(false)
-				}
 				Timber.d("Danmaku loaded for %s", item.name)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to load danmaku")
@@ -571,6 +599,7 @@ class BilibiliPlayerFragment : Fragment() {
 	override fun onDestroyView() {
 		super.onDestroyView()
 		exiting = true
+		releaseScreensaverLock()
 		stopProgressReportLoop()
 		handler.removeCallbacksAndMessages(null)
 		danmakuManager?.release()
