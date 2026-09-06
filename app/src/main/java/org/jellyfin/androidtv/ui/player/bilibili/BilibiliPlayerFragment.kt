@@ -148,21 +148,11 @@ class BilibiliPlayerFragment : Fragment() {
 			AndroidView(
 				modifier = Modifier.fillMaxSize(),
 				factory = { ctx ->
-					// Wrapper carries the diagnostic tint: TextureView itself does not
-					// support background drawables (UnsupportedOperationException).
-					android.widget.FrameLayout(ctx).apply {
-						setBackgroundColor(0x3300FF00)
-						val dtv = DanmakuTextureView(ctx).apply {
-							// SurfaceTexture creation happens in draw(); DFM sets willNotDraw(true)
-							// which blocks it. Force it off so onSurfaceTextureAvailable fires.
-							setWillNotDraw(false)
-							layoutParams = android.widget.FrameLayout.LayoutParams(
-								android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-								android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-							)
-						}
-						addView(dtv)
-						danmakuView = dtv
+					DanmakuTextureView(ctx).also {
+						// SurfaceTexture creation happens in draw(); DFM sets willNotDraw(true)
+						// which blocks it. Force it off so onSurfaceTextureAvailable fires.
+						it.setWillNotDraw(false)
+						danmakuView = it
 					}
 				}
 			)
@@ -601,15 +591,6 @@ class BilibiliPlayerFragment : Fragment() {
 
 	// Danmaku
 
-	private fun danmakuStatus(text: String) {
-		// Visible diagnostic: shows each danmaku loading stage on screen for 4s
-		seekHintState = "弹幕：$text"
-		seekHintRunnable?.let { handler.removeCallbacks(it) }
-		val runnable = Runnable { if (seekHintState == "弹幕：$text") seekHintState = null }
-		seekHintRunnable = runnable
-		handler.postDelayed(runnable, 4000)
-	}
-
 	private fun resetDanmaku() {
 		danmakuManager?.release()
 		danmakuManager = null
@@ -624,17 +605,14 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuView
 			} ?: run {
 				Timber.w("Danmaku view not available in time")
-				danmakuStatus("视图未就绪（5s 超时）")
 				return@launch
 			}
 
-			danmakuStatus("获取数据…")
 			var xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
 
 			if (xml.isNullOrBlank()) {
 				// No cached danmaku on the server: request an auto-match and poll for it
 				Timber.d("No cached danmaku for %s, requesting refresh", item.name)
-				danmakuStatus("服务器无缓存，请求匹配…")
 				runCatching { danmakuApi.refreshDanmaku(item.id.toString(), force = true) }
 				repeat(10) {
 					delay(3000)
@@ -648,25 +626,22 @@ class BilibiliPlayerFragment : Fragment() {
 
 			if (xml.isNullOrBlank()) {
 				Timber.d("No danmaku data for %s", item.name)
-				danmakuStatus("服务器无弹幕数据")
 				return@launch
 			}
-			danmakuStatus("已获取 ${xml.length / 1024}KB，解析中…")
 
 			try {
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)
-				// Experimental fix: bypass CacheManagingDrawTask (its build-cache thread
-				// previously crashed with NPE and may silently produce empty caches);
-				// plain DrawTask renders text directly and is much simpler.
+				// Bypass CacheManagingDrawTask (its build-cache thread previously crashed
+				// with NPE and may silently produce empty caches); plain DrawTask renders
+				// text directly and is much simpler.
 				view.enableDanmakuDrawingCache(false)
 				val parser = JellyfinDanmakuParser()
 				manager.onEnginePrepared = {
 					// Called on the main thread (posted) after the engine thread finished
 					// parsing - safe to query the danmaku set here.
 					val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
-					val p = runCatching { parser }
-					danmakuStatus("引擎就绪 count=$count")
+					Timber.d("Danmaku engine prepared, %s danmakus loaded", count)
 				}
 				val dataSource = DanmakuDataSource()
 				dataSource.loadFromString(xml)
@@ -679,25 +654,8 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuManager = manager
 				danmakuLoadedState = true
 				Timber.d("Danmaku load requested for %s", item.name)
-
-				// Live monitor: persistent merged status (never auto-hidden while playing)
-				launch {
-					var last = ""
-					while (isActive && danmakuManager === manager) {
-						delay(600)
-						val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
-						val state = runCatching { manager.getDiagnostics() }.getOrDefault("diag-error") +
-								" count=$count " +
-								master.flame.danmaku.controller.DrawTask.listDiag
-						if (state != last) {
-							last = state
-							seekHintState = state
-						}
-					}
-				}
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to load danmaku")
-				danmakuStatus("加载失败：${e.message}")
 			}
 		}
 	}
