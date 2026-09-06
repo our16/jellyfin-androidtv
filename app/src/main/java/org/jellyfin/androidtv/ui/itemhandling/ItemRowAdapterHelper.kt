@@ -576,8 +576,21 @@ fun ItemRowAdapter.retrieveItems(
 			}
 
 			totalItems = response.totalRecordCount
+
+			// Server-side sorting is lexicographic ("1", "10", "11", "2", ...).
+			// When the whole folder fits into this single response there is no
+			// pagination to break, so re-sort naturally (1, 2, ... 10) by name.
+			val items = if (startIndex == 0 && response.totalRecordCount <= response.items.size) {
+				val natural = Comparator<org.jellyfin.sdk.model.api.BaseItemDto> { a, b ->
+					compareNatural(a.sortName ?: a.name ?: "", b.sortName ?: b.name ?: "")
+				}
+				response.items.sortedWith(natural)
+			} else {
+				response.items
+			}
+
 			setItems(
-				items = response.items,
+				items = items,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
@@ -593,6 +606,36 @@ fun ItemRowAdapter.retrieveItems(
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
 		)
 	}
+}
+
+/**
+ * Natural string comparison: runs of digits are compared by numeric value so
+ * "1" < "2" < "10" instead of the lexicographic "1" < "10" < "2".
+ */
+fun compareNatural(a: String, b: String): Int {
+	var ia = 0
+	var ib = 0
+	while (ia < a.length && ib < b.length) {
+		val ca = a[ia]
+		val cb = b[ib]
+		if (ca.isDigit() && cb.isDigit()) {
+			var ea = ia
+			while (ea < a.length && a[ea].isDigit()) ea++
+			var eb = ib
+			while (eb < b.length && b[eb].isDigit()) eb++
+			val na = a.substring(ia, ea).toLong()
+			val nb = b.substring(ib, eb).toLong()
+			if (na != nb) return na.compareTo(nb)
+			ia = ea
+			ib = eb
+		} else {
+			val diff = ca.lowercaseChar().code - cb.lowercaseChar().code
+			if (diff != 0) return diff
+			ia++
+			ib++
+		}
+	}
+	return (a.length - ia) - (b.length - ib)
 }
 
 fun ItemRowAdapter.retrievePremieres(
