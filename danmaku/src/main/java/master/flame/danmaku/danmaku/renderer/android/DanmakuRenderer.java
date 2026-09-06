@@ -29,6 +29,25 @@ import master.flame.danmaku.danmaku.renderer.Renderer;
 
 public class DanmakuRenderer extends Renderer {
 
+    // Diagnostics: per-stage skip counters for the most recent draw pass,
+    // read by the player UI to show why danmakus are (not) being rendered.
+    public static volatile int diagTimeoutSkip;
+    public static volatile int diagOffsetSkip;
+    public static volatile int diagStartRenderSkip;
+    public static volatile int diagLateBreak;
+    public static volatile int diagFilterSkip;
+    public static volatile int diagInvisibleSkip;
+    public static volatile int diagShownCount;
+
+    public static String getSkipDiag() {
+        return "off=" + diagOffsetSkip
+                + " srt=" + diagStartRenderSkip
+                + " late=" + diagLateBreak
+                + " filt=" + diagFilterSkip
+                + " vis=" + diagInvisibleSkip
+                + " shown=" + diagShownCount;
+    }
+
     private class Consumer extends IDanmakus.DefaultConsumer<BaseDanmaku> {
         private BaseDanmaku lastItem;
         public IDisplayer disp;
@@ -36,14 +55,28 @@ public class DanmakuRenderer extends Renderer {
         public long startRenderTime;
 
         @Override
+        public void before() {
+            diagTimeoutSkip = 0;
+            diagOffsetSkip = 0;
+            diagStartRenderSkip = 0;
+            diagLateBreak = 0;
+            diagFilterSkip = 0;
+            diagInvisibleSkip = 0;
+            diagShownCount = 0;
+            super.before();
+        }
+
+        @Override
         public int accept(BaseDanmaku drawItem) {
             lastItem = drawItem;
             if (drawItem.isTimeOut()) {
+                diagTimeoutSkip++;
                 disp.recycle(drawItem);
                 return renderingState.isRunningDanmakus ? ACTION_REMOVE : ACTION_CONTINUE;
             }
 
             if (!renderingState.isRunningDanmakus && drawItem.isOffset()) {
+                diagOffsetSkip++;
                 return ACTION_CONTINUE;
             }
 
@@ -52,10 +85,16 @@ public class DanmakuRenderer extends Renderer {
             }
             if (drawItem.getActualTime() < startRenderTime
                     || (drawItem.priority == 0 && drawItem.isFiltered())) {
+                if (drawItem.getActualTime() < startRenderTime) {
+                    diagStartRenderSkip++;
+                } else {
+                    diagFilterSkip++;
+                }
                 return ACTION_CONTINUE;
             }
 
             if (drawItem.isLate()) {
+                diagLateBreak++;
                 IDrawingCache<?> cache = drawItem.getDrawingCache();
                 if (mCacheManager != null && (cache == null || cache.get() == null)) {
                     mCacheManager.addDanmaku(drawItem);
@@ -84,6 +123,7 @@ public class DanmakuRenderer extends Renderer {
             // draw
             if (drawItem.isShown()) {
                 if (drawItem.lines == null && drawItem.getBottom() > disp.getHeight()) {
+                    diagInvisibleSkip++;
                     return ACTION_CONTINUE;    // skip bottom outside danmaku
                 }
                 int renderingType = drawItem.draw(disp);
@@ -98,12 +138,15 @@ public class DanmakuRenderer extends Renderer {
                 renderingState.addCount(drawItem.getType(), 1);
                 renderingState.addTotalCount(1);
                 renderingState.appendToRunningDanmakus(drawItem);
+                diagShownCount++;
 
                 if (mOnDanmakuShownListener != null
                         && drawItem.firstShownFlag != mContext.mGlobalFlagValues.FIRST_SHOWN_RESET_FLAG) {
                     drawItem.firstShownFlag = mContext.mGlobalFlagValues.FIRST_SHOWN_RESET_FLAG;
                     mOnDanmakuShownListener.onDanmakuShown(drawItem);
                 }
+            } else {
+                diagInvisibleSkip++;
             }
             return ACTION_CONTINUE;
         }

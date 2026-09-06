@@ -163,6 +163,18 @@ class DanmakuManager(private val activity: Activity) {
     fun getCurrentTime(): Long = danmakuView?.getCurrentTime() ?: 0L
 
     /**
+     * Aggregated engine diagnostics for the player UI.
+     */
+    fun getDiagnostics(): String {
+        val view = danmakuView ?: return "no-view"
+        val ready = runCatching { view.isViewReady() }.getOrDefault(false)
+        val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
+        val time = runCatching { view.getCurrentTime() }.getOrDefault(-1L)
+        val render = runCatching { view.renderDiag }.getOrDefault("")
+        return "surface=${if (ready) "OK" else "wait"} engine=${if (prepared) "OK" else "wait"} time=$time $render"
+    }
+
+    /**
      * Add a single danmaku item (for live danmaku).
      */
     fun addDanmaku(item: BaseDanmaku) {

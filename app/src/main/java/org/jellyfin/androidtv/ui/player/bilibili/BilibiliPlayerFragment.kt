@@ -651,8 +651,8 @@ class BilibiliPlayerFragment : Fragment() {
 					// Called on the main thread (posted) after the engine thread finished
 					// parsing - safe to query the danmaku set here.
 					val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
-					val engineTime = runCatching { manager.getCurrentTime() }.getOrDefault(-1)
-					danmakuStatus("引擎就绪 count=$count time=$engineTime")
+					val p = runCatching { parser }
+					danmakuStatus("引擎就绪 count=$count")
 				}
 				val dataSource = DanmakuDataSource()
 				dataSource.loadFromString(xml)
@@ -666,23 +666,17 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuLoadedState = true
 				Timber.d("Danmaku load requested for %s", item.name)
 
-				// Live monitor: surface availability is the usual silent blocker
+				// Live monitor: persistent merged status (never auto-hidden while playing)
 				launch {
 					var last = ""
 					while (isActive && danmakuManager === manager) {
 						delay(600)
-						val ready = runCatching { view.isViewReady() }.getOrDefault(false)
-						val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
-						val diag = runCatching { view.renderDiag }.getOrDefault("")
-						val engineTime = runCatching { manager.getCurrentTime() }.getOrDefault(-1)
-						val state = when {
-							prepared -> "surface=OK engine=OK time=$engineTime $diag"
-							ready -> "surface=OK 引擎解析中…"
-							else -> "等待视图 surface…"
-						}
+						val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
+						val state = runCatching { manager.getDiagnostics() }.getOrDefault("diag-error") +
+								" count=$count"
 						if (state != last) {
 							last = state
-							danmakuStatus(state)
+							seekHintState = state
 						}
 					}
 				}

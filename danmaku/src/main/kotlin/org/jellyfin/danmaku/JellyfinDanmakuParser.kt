@@ -28,6 +28,17 @@ import java.io.InputStream
  */
 class JellyfinDanmakuParser : BaseDanmakuParser() {
 
+    // Diagnostics: how many <d> nodes were seen, how many danmakus were
+    // created and how many actually landed in the collection.
+    var xmlDCount = 0
+        private set
+    var createdCount = 0
+        private set
+    var addedCount = 0
+        private set
+    var parseErrorCount = 0
+        private set
+
     override fun parse(): IDanmakus {
         val source = mDataSource ?: return Danmakus()
         
@@ -40,6 +51,7 @@ class JellyfinDanmakuParser : BaseDanmakuParser() {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            parseErrorCount++
         }
         
         return danmakus
@@ -57,13 +69,19 @@ class JellyfinDanmakuParser : BaseDanmakuParser() {
         while (eventType != XmlPullParser.END_DOCUMENT) {
             if (eventType == XmlPullParser.START_TAG) {
                 if (parser.name == "d") {
+                    xmlDCount++
                     val pAttribute = parser.getAttributeValue(null, "p")
                     val text = parser.nextText()
                     
                     if (pAttribute != null && text != null) {
                         val danmaku = parseDanmakuItem(pAttribute, text)
                         if (danmaku != null) {
-                            danmakus.addItem(danmaku)
+                            createdCount++
+                            if (danmakus.addItem(danmaku)) {
+                                addedCount++
+                            } else {
+                                parseErrorCount++
+                            }
                         }
                     }
                 }
@@ -110,11 +128,14 @@ class JellyfinDanmakuParser : BaseDanmakuParser() {
                     // Fixed danmaku - use common duration
                     danmaku.setDuration(Duration(COMMON_DANMAKU_DURATION))
                 }
+            } else {
+                parseErrorCount++
             }
             
             return danmaku
         } catch (e: Exception) {
             e.printStackTrace()
+            parseErrorCount++
             return null
         }
     }

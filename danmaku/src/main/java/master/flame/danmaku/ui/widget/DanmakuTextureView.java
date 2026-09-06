@@ -42,6 +42,7 @@ import master.flame.danmaku.danmaku.model.IDanmakus;
 import master.flame.danmaku.danmaku.model.android.DanmakuContext;
 import master.flame.danmaku.danmaku.parser.BaseDanmakuParser;
 import master.flame.danmaku.danmaku.renderer.IRenderer.RenderingState;
+import master.flame.danmaku.danmaku.renderer.android.DanmakuRenderer;
 import master.flame.danmaku.danmaku.util.SystemClock;
 
 /**
@@ -295,7 +296,8 @@ public class DanmakuTextureView extends TextureView implements IDanmakuView, IDa
             if (handler != null) {
                 RenderingState rs = handler.draw(canvas);
                 if (rs != null) {
-                    renderDiag = "draw total=" + rs.totalDanmakuCount + " r2l=" + rs.r2lDanmakuCount;
+                    renderDiag = "total=" + rs.totalDanmakuCount + " r2l=" + rs.r2lDanmakuCount
+                            + " " + DanmakuRenderer.getSkipDiag();
                 } else {
                     renderDiag = "draw rs=null";
                 }
