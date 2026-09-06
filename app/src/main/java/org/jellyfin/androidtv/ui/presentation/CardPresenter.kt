@@ -137,6 +137,21 @@ private data class BaseRowItemDisplayConfig(
 	val scaleType: ImageView.ScaleType? = null,
 )
 
+private val LANDSCAPE_CONTENT_TYPES = setOf(
+	BaseItemKind.MOVIE,
+	BaseItemKind.VIDEO,
+	BaseItemKind.SERIES,
+	BaseItemKind.SEASON,
+	BaseItemKind.EPISODE,
+	BaseItemKind.USER_VIEW,
+	BaseItemKind.COLLECTION_FOLDER,
+	BaseItemKind.FOLDER,
+	BaseItemKind.GENRE,
+	BaseItemKind.MUSIC_GENRE,
+	BaseItemKind.PLAYLIST,
+	BaseItemKind.PHOTO_ALBUM,
+)
+
 private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
 	BaseRowType.BaseItem -> {
 		val preferSeriesPoster = this is BaseItemDtoBaseRowItem && preferSeriesPoster
@@ -149,13 +164,18 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 			else -> primaryAspectRatio ?: ImageHelper.ASPECT_RATIO_7_9.toFloat()
 		}
 
+		// Media content uses landscape (16:9) thumbnails so titles are recognizable
+		// on the TV, independent of the poster-oriented default image type
+		val preferLandscape = baseItem?.type in LANDSCAPE_CONTENT_TYPES
+
 		val base = BaseRowItemDisplayConfig(
-			aspectRatio = when (imageType) {
-				ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
-				ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+			aspectRatio = when {
+				preferLandscape -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+				imageType == ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+				imageType == ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
 				else -> defaultAspectRatio
 			},
-			image = getImage(imageType),
+			image = if (preferLandscape) getImage(ImageType.THUMB) else getImage(imageType),
 			iconRes = R.drawable.ic_clapperboard,
 		)
 
@@ -172,13 +192,13 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 			)
 
 			BaseItemKind.SEASON, BaseItemKind.SERIES -> base.copy(
-				aspectRatio = if (imageType == ImageType.POSTER) ImageHelper.ASPECT_RATIO_2_3.toFloat() else base.aspectRatio,
+				aspectRatio = if (imageType == ImageType.POSTER && !preferLandscape) ImageHelper.ASPECT_RATIO_2_3.toFloat() else base.aspectRatio,
 				iconRes = R.drawable.ic_tv
 			)
 
 			BaseItemKind.EPISODE -> when (preferSeriesPoster) {
 				true -> base.copy(
-					aspectRatio = ImageHelper.ASPECT_RATIO_2_3.toFloat(),
+					aspectRatio = if (preferLandscape) base.aspectRatio else ImageHelper.ASPECT_RATIO_2_3.toFloat(),
 					iconRes = R.drawable.ic_tv
 				)
 
@@ -207,7 +227,7 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 			)
 
 			BaseItemKind.MOVIE, BaseItemKind.VIDEO -> base.copy(
-				aspectRatio = when (imageType) {
+				aspectRatio = if (preferLandscape) base.aspectRatio else when (imageType) {
 					ImageType.POSTER -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
 					else -> base.aspectRatio
 				},
