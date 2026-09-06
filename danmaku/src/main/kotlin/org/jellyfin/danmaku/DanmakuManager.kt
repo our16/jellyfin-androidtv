@@ -171,7 +171,16 @@ class DanmakuManager(private val activity: Activity) {
         val prepared = runCatching { view.isPrepared() }.getOrDefault(false)
         val time = runCatching { view.getCurrentTime() }.getOrDefault(-1L)
         val render = runCatching { view.renderDiag }.getOrDefault("")
-        return "surface=${if (ready) "OK" else "wait"} engine=${if (prepared) "OK" else "wait"} time=$time $render"
+        var dispDiag = ""
+        runCatching {
+            val disp = danmakuContext?.displayer
+            if (disp is master.flame.danmaku.danmaku.model.android.AndroidDisplayer) {
+                dispDiag = " dispW=${disp.width} dispH=${disp.height}"
+            }
+            val dur = danmakuContext?.mDanmakuFactory?.MAX_Duration_Scroll_Danmaku?.value
+            dispDiag += " dur=$dur"
+        }
+        return "surface=${if (ready) "OK" else "wait"} engine=${if (prepared) "OK" else "wait"} time=$time$dispDiag $render"
     }
 
     /**

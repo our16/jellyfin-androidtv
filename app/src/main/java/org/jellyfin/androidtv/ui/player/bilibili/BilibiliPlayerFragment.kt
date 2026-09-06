@@ -152,6 +152,9 @@ class BilibiliPlayerFragment : Fragment() {
 						// SurfaceTexture creation happens in draw(); DFM sets willNotDraw(true)
 						// which blocks it. Force it off so onSurfaceTextureAvailable fires.
 						it.setWillNotDraw(false)
+						// TEMP diagnostic: visible green tint proves the danmaku view layer
+						// is present, sized and above the video. Remove once fixed.
+						it.setBackgroundColor(0x3300FF00)
 						danmakuView = it
 					}
 				}
