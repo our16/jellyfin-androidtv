@@ -62,7 +62,7 @@ import kotlin.coroutines.suspendCoroutine
  * Bilibili style TV player: direction keys seek instantly without stopping playback,
  * items play straight away with resume support and danmaku overlay.
  */
-class BilibiliPlayerFragment : Fragment() {
+class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	companion object {
 		const val EXTRA_POSITION: String = "position"
 		private const val AUTO_HIDE_CONTROLS_MS = 3500L
@@ -306,47 +306,54 @@ class BilibiliPlayerFragment : Fragment() {
 		root.isFocusable = true
 		root.isFocusableInTouchMode = true
 		root.requestFocus()
-		root.setOnKeyListener { _, keyCode, event ->
-			val isDown = event.action == KeyEvent.ACTION_DOWN
-			val isUp = event.action == KeyEvent.ACTION_UP
-			if (controlsVisible || danmakuSettingsVisible) return@setOnKeyListener false
-			when (keyCode) {
-				KeyEvent.KEYCODE_DPAD_LEFT,
-				KeyEvent.KEYCODE_MEDIA_REWIND,
-				KeyEvent.KEYCODE_BUTTON_L1 -> {
-					if (isDown) seekBy(-userSettingPreferences[UserSettingPreferences.skipBackLength].toLong())
-					true
-				}
-				KeyEvent.KEYCODE_DPAD_RIGHT,
-				KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-				KeyEvent.KEYCODE_BUTTON_R1 -> {
-					if (isDown) seekBy(userSettingPreferences[UserSettingPreferences.skipForwardLength].toLong())
-					true
-				}
-				KeyEvent.KEYCODE_DPAD_CENTER,
-				KeyEvent.KEYCODE_ENTER,
-				KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-					if (isUp) {
-						togglePlayPause()
-						// give visual feedback: show controls when pausing so the state is obvious
-						if (player?.isPlaying == false) showControls()
-					}
-					true
-				}
-				KeyEvent.KEYCODE_DPAD_DOWN -> {
-					if (isUp) showControls()
-					true
-				}
-				KeyEvent.KEYCODE_MEDIA_PLAY -> {
-					if (isUp) player?.play()
-					true
-				}
-				KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-					if (isUp) player?.pause()
-					true
-				}
-				else -> false
+	}
+
+	/**
+	 * Key handling implemented as View.OnKeyListener so MainActivity's fragment key
+	 * dispatch reaches us regardless of which child view currently holds focus
+	 * (a root-view-only key listener missed keys until focus returned to the root).
+	 */
+	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
+		if (event == null) return false
+		val isDown = event.action == KeyEvent.ACTION_DOWN
+		val isUp = event.action == KeyEvent.ACTION_UP
+		if (controlsVisible || danmakuSettingsVisible) return false
+		return when (keyCode) {
+			KeyEvent.KEYCODE_DPAD_LEFT,
+			KeyEvent.KEYCODE_MEDIA_REWIND,
+			KeyEvent.KEYCODE_BUTTON_L1 -> {
+				if (isDown) seekBy(-userSettingPreferences[UserSettingPreferences.skipBackLength].toLong())
+				true
 			}
+			KeyEvent.KEYCODE_DPAD_RIGHT,
+			KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+			KeyEvent.KEYCODE_BUTTON_R1 -> {
+				if (isDown) seekBy(userSettingPreferences[UserSettingPreferences.skipForwardLength].toLong())
+				true
+			}
+			KeyEvent.KEYCODE_DPAD_CENTER,
+			KeyEvent.KEYCODE_ENTER,
+			KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+				if (isUp) {
+					togglePlayPause()
+					// give visual feedback: show controls when pausing so the state is obvious
+					if (player?.isPlaying == false) showControls()
+				}
+				true
+			}
+			KeyEvent.KEYCODE_DPAD_DOWN -> {
+				if (isUp) showControls()
+				true
+			}
+			KeyEvent.KEYCODE_MEDIA_PLAY -> {
+				if (isUp) player?.play()
+				true
+			}
+			KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+				if (isUp) player?.pause()
+				true
+			}
+			else -> false
 		}
 	}
 

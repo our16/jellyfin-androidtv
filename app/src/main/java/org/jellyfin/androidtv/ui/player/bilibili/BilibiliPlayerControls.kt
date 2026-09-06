@@ -114,6 +114,21 @@ fun BilibiliPlayerControls(
 			)
 		}
 
+		// Danmaku settings popup lives on the root overlay (NOT inside the bottom bar row):
+		// a menu nested in the gear button's Box would inflate the Box and shift neighbouring buttons
+		if (danmakuSettingsExpanded) {
+			DanmakuSettingsPopup(
+				textSizeIdx = textSizeIdx,
+				speedIdx = speedIdx,
+				opacityIdx = opacityIdx,
+				areaIdx = areaIdx,
+				onCycle = onCycleDanmakuSetting,
+				onInteraction = onInteraction,
+				onDismiss = { onDanmakuSettingsExpandedChange(false) },
+				modifier = Modifier.align(Alignment.BottomEnd),
+			)
+		}
+
 		AnimatedVisibility(
 			visible = visible,
 			enter = fadeIn() + slideInVertically { -it },
@@ -334,28 +349,12 @@ private fun BottomBar(
 				tint = if (danmakuLoaded && danmakuVisible) BiliPink else Color(0x61FFFFFF),
 				onClick = onToggleDanmaku,
 			)
-			Box {
-				ControlButton(
-					icon = painterResource(R.drawable.ic_bili_danmaku_settings),
-					contentDescription = "danmaku settings",
-					tint = if (danmakuSettingsExpanded) BiliPink else Color.White,
-					onClick = { onDanmakuSettingsExpandedChange(true) },
-				)
-				if (danmakuSettingsExpanded) {
-					// Custom anchored popup: plain Compose focusable rows so the TV remote's
-					// D-pad moves between options (DropdownMenu only supports Tab navigation)
-					DanmakuSettingsPopup(
-						textSizeIdx = textSizeIdx,
-						speedIdx = speedIdx,
-						opacityIdx = opacityIdx,
-						areaIdx = areaIdx,
-						onCycle = onCycleDanmakuSetting,
-						onInteraction = onInteraction,
-						onDismiss = { onDanmakuSettingsExpandedChange(false) },
-						modifier = Modifier.align(Alignment.BottomEnd),
-					)
-				}
-			}
+			ControlButton(
+				icon = painterResource(R.drawable.ic_bili_danmaku_settings),
+				contentDescription = "danmaku settings",
+				tint = if (danmakuSettingsExpanded) BiliPink else Color.White,
+				onClick = { onDanmakuSettingsExpandedChange(true) },
+			)
 			if (hasNext) {
 				ControlButton(
 					icon = painterResource(R.drawable.ic_bili_next),
@@ -383,7 +382,7 @@ private fun DanmakuSettingsPopup(
 
 	Column(
 		modifier = modifier
-			.offset(x = 0.dp, y = -212.dp)
+			.offset(x = (-24).dp, y = -216.dp)
 			.width(230.dp)
 			.background(Color(0xF0222222), RoundedCornerShape(10.dp))
 			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
