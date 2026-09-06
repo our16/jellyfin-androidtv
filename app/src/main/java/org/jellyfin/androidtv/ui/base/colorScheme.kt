@@ -35,6 +35,7 @@ fun colorScheme(): ColorScheme = ColorScheme(
 	listButton = Color.Transparent,
 	listButtonFocused = Tokens.Color.colorBluegrey800,
 	surface = Tokens.Color.colorBluegrey900,
+	focusedSurface = Tokens.Color.colorBluegrey700,
 	scrim = Tokens.Color.colorBlack.copy(alpha = 0.67f),
 )
 
@@ -76,6 +77,7 @@ data class ColorScheme(
 	val listButtonFocused: Color,
 
 	val surface: Color,
+	val focusedSurface: Color,
 	val scrim: Color,
 )
 

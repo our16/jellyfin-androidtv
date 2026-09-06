@@ -308,6 +308,7 @@ private fun CardViewHolderContent(
 
 	val card = @Composable {
 		ItemCard(
+			focused = focused,
 			image = {
 				if (image != null) {
 					val api = koinInject<ApiClient>()
@@ -393,6 +394,7 @@ private fun CardViewHolderContent(
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
 						textAlign = TextAlign.Center,
+						color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,
 						modifier = Modifier.then(focusModifier),
 					)
 				}
