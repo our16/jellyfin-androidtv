@@ -208,6 +208,28 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var screensaverInAppEnabled = booleanPreference("screensaver_inapp_enabled", true)
 
+		/* Danmaku */
+
+		/**
+		 * Danmaku text size preset index (0 small, 1 normal, 2 large, 3 extra large)
+		 */
+		var danmakuTextSizeIdx = intPreference("danmaku_text_size_idx", 2)
+
+		/**
+		 * Danmaku scroll speed preset index (0 slow, 1 normal, 2 fast, 3 very fast)
+		 */
+		var danmakuSpeedIdx = intPreference("danmaku_speed_idx", 1)
+
+		/**
+		 * Danmaku opacity preset index (0: 30%, 1: 50%, 2: 70%, 3: 85%, 4: 100%)
+		 */
+		var danmakuOpacityIdx = intPreference("danmaku_opacity_idx", 3)
+
+		/**
+		 * Danmaku display area preset index (0: 1/3 screen, 1: half, 2: 3/4, 3: full)
+		 */
+		var danmakuAreaIdx = intPreference("danmaku_area_idx", 3)
+
 		/**
 		 * Timeout before showing the screensaver in app, depends on [screensaverInAppEnabled].
 		 */

@@ -187,6 +187,7 @@
     <string name="lbl_zoom">Zoom</string>
     <string name="lbl_danmaku">Danmaku</string>
     <string name="msg_danmaku_not_loaded">Danmaku not available for this video</string>
+    <string name="lbl_danmaku_settings">Danmaku settings</string>
     <string name="playback_info">Playback info</string>
     <string name="playback_info_play_method">Play method: %1$s</string>
     <string name="playback_info_direct_play">Directplay</string>

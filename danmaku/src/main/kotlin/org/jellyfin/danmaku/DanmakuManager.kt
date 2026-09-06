@@ -163,6 +163,26 @@ class DanmakuManager(private val activity: Activity) {
     fun getCurrentTime(): Long = danmakuView?.getCurrentTime() ?: 0L
 
     /**
+     * Apply user display settings to the running engine (hot-applied).
+     *
+     * @param textSize  scaleTextSize factor (1.0 = original XML size)
+     * @param speed     scrollSpeedFactor (larger = slower)
+     * @param opacity   0..1 (1 = fully opaque)
+     * @param area      0..1 fraction of screen height usable by danmaku
+     */
+    fun applySettings(textSize: Float, speed: Float, opacity: Float, area: Float) {
+        val ctx = danmakuContext ?: return
+        runCatching {
+            ctx.setScaleTextSize(textSize)
+            ctx.setScrollSpeedFactor(speed)
+            ctx.setDanmakuTransparency(opacity)
+            val h = ctx.mDisplayer.height
+            if (h > 0) ctx.setDanmakuMargin((h * (1f - area)).toInt())
+        }
+        Timber.d("Danmaku settings applied: size=%s speed=%s opacity=%s area=%s", textSize, speed, opacity, area)
+    }
+
+    /**
      * Aggregated engine diagnostics for the player UI.
      */
     fun getDiagnostics(): String {

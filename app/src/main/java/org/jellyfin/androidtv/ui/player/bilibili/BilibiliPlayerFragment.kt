@@ -114,6 +114,56 @@ class BilibiliPlayerFragment : Fragment() {
 	private var exiting = false
 	private var screensaverLock: (() -> Unit)? = null
 
+	// Danmaku display settings (preset indices, persisted in UserPreferences)
+	private var danmakuSettingsVisible by mutableStateOf(false)
+	private var danmakuTextSizeIdxState by mutableStateOf(userPreferences[UserPreferences.danmakuTextSizeIdx])
+	private var danmakuSpeedIdxState by mutableStateOf(userPreferences[UserPreferences.danmakuSpeedIdx])
+	private var danmakuOpacityIdxState by mutableStateOf(userPreferences[UserPreferences.danmakuOpacityIdx])
+	private var danmakuAreaIdxState by mutableStateOf(userPreferences[UserPreferences.danmakuAreaIdx])
+
+	private fun currentDanmakuSettings() = Triple(
+		danmakuTextSizes[danmakuTextSizeIdxState.coerceIn(0, danmakuTextSizes.lastIndex)],
+		danmakuSpeeds[danmakuSpeedIdxState.coerceIn(0, danmakuSpeeds.lastIndex)],
+		danmakuOpacities[danmakuOpacityIdxState.coerceIn(0, danmakuOpacities.lastIndex)] / 100f
+	) to danmakuAreas[danmakuAreaIdxState.coerceIn(0, danmakuAreas.lastIndex)]
+
+	private fun applyDanmakuSettings() {
+		val (sizeSpeed, area) = currentDanmakuSettings()
+		danmakuManager?.applySettings(sizeSpeed.first, sizeSpeed.second, sizeSpeed.third, area)
+	}
+
+	private fun openDanmakuSettings() {
+		danmakuTextSizeIdxState = userPreferences[UserPreferences.danmakuTextSizeIdx]
+		danmakuSpeedIdxState = userPreferences[UserPreferences.danmakuSpeedIdx]
+		danmakuOpacityIdxState = userPreferences[UserPreferences.danmakuOpacityIdx]
+		danmakuAreaIdxState = userPreferences[UserPreferences.danmakuAreaIdx]
+		danmakuSettingsVisible = true
+	}
+
+	/** cycling one preset forward for the given setting group (0 size, 1 speed, 2 area, 3 opacity) */
+	private fun cycleDanmakuSetting(which: Int) {
+		fun Int.cycled(size: Int) = (this + 1) % size
+		when (which) {
+			0 -> {
+				danmakuTextSizeIdxState = danmakuTextSizeIdxState.cycled(danmakuTextSizes.size)
+				userPreferences[UserPreferences.danmakuTextSizeIdx] = danmakuTextSizeIdxState
+			}
+			1 -> {
+				danmakuSpeedIdxState = danmakuSpeedIdxState.cycled(danmakuSpeeds.size)
+				userPreferences[UserPreferences.danmakuSpeedIdx] = danmakuSpeedIdxState
+			}
+			2 -> {
+				danmakuAreaIdxState = danmakuAreaIdxState.cycled(danmakuAreas.size)
+				userPreferences[UserPreferences.danmakuAreaIdx] = danmakuAreaIdxState
+			}
+			3 -> {
+				danmakuOpacityIdxState = danmakuOpacityIdxState.cycled(danmakuOpacities.size)
+				userPreferences[UserPreferences.danmakuOpacityIdx] = danmakuOpacityIdxState
+			}
+		}
+		applyDanmakuSettings()
+	}
+
 	// Playback failure fallback: direct play -> direct stream -> forced transcode
 	private var playbackRetryCount = 0
 
@@ -175,6 +225,17 @@ class BilibiliPlayerFragment : Fragment() {
 				onStepForward = { seekBy(userSettingPreferences[UserSettingPreferences.skipForwardLength].toLong()) },
 				onPlayNext = ::playNext,
 				onToggleDanmaku = ::toggleDanmaku,
+				onOpenDanmakuSettings = ::openDanmakuSettings,
+			)
+
+			BilibiliDanmakuSettingsPanel(
+				visible = danmakuSettingsVisible,
+				textSizeIdx = danmakuTextSizeIdxState,
+				speedIdx = danmakuSpeedIdxState,
+				opacityIdx = danmakuOpacityIdxState,
+				areaIdx = danmakuAreaIdxState,
+				onCycle = ::cycleDanmakuSetting,
+				onDismiss = { danmakuSettingsVisible = false },
 			)
 		}
 	}
@@ -257,7 +318,7 @@ class BilibiliPlayerFragment : Fragment() {
 		root.setOnKeyListener { _, keyCode, event ->
 			val isDown = event.action == KeyEvent.ACTION_DOWN
 			val isUp = event.action == KeyEvent.ACTION_UP
-			if (controlsVisible) return@setOnKeyListener false
+			if (controlsVisible || danmakuSettingsVisible) return@setOnKeyListener false
 			when (keyCode) {
 				KeyEvent.KEYCODE_DPAD_LEFT,
 				KeyEvent.KEYCODE_MEDIA_REWIND,
@@ -293,10 +354,10 @@ class BilibiliPlayerFragment : Fragment() {
 
 	private fun setupBackHandling() {
 		requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
-			if (controlsVisible) {
-				hideControls()
-			} else {
-				exitPlayback()
+			when {
+				danmakuSettingsVisible -> danmakuSettingsVisible = false
+				controlsVisible -> hideControls()
+				else -> exitPlayback()
 			}
 		}
 	}
@@ -653,6 +714,7 @@ class BilibiliPlayerFragment : Fragment() {
 				manager.loadDanmaku(parser, player?.currentPosition ?: 0)
 				danmakuManager = manager
 				danmakuLoadedState = true
+				applyDanmakuSettings()
 				Timber.d("Danmaku load requested for %s", item.name)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to load danmaku")

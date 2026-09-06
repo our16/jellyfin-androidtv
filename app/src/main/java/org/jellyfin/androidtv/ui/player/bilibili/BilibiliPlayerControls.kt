@@ -80,6 +80,7 @@ fun BilibiliPlayerControls(
 	onStepForward: () -> Unit,
 	onPlayNext: () -> Unit,
 	onToggleDanmaku: () -> Unit,
+	onOpenDanmakuSettings: () -> Unit,
 ) {
 	Box(modifier = Modifier.fillMaxSize()) {
 		if (visible && isBuffering) {
@@ -139,8 +140,114 @@ fun BilibiliPlayerControls(
 				onStepForward = onStepForward,
 				onPlayNext = onPlayNext,
 				onToggleDanmaku = onToggleDanmaku,
+				onOpenDanmakuSettings = onOpenDanmakuSettings,
 			)
 		}
+	}
+}
+
+// Danmaku display settings presets
+val danmakuTextSizes = floatArrayOf(0.8f, 1.0f, 1.3f, 1.6f)
+val danmakuTextSizeLabels = arrayOf("小", "标准", "大", "特大")
+val danmakuSpeeds = floatArrayOf(1.5f, 1.2f, 0.9f, 0.6f)
+val danmakuSpeedLabels = arrayOf("慢", "正常", "快", "极快")
+val danmakuOpacities = intArrayOf(30, 50, 70, 85, 100)
+val danmakuAreas = floatArrayOf(0.35f, 0.5f, 0.75f, 1.0f)
+val danmakuAreaLabels = arrayOf("1/3屏", "半屏", "3/4屏", "全屏")
+
+@Composable
+fun BilibiliDanmakuSettingsPanel(
+	visible: Boolean,
+	textSizeIdx: Int,
+	speedIdx: Int,
+	opacityIdx: Int,
+	areaIdx: Int,
+	onCycle: (Int) -> Unit,
+	onDismiss: () -> Unit,
+) {
+	val focusRequester = remember { FocusRequester() }
+	LaunchedEffect(visible) {
+		if (visible) focusRequester.requestFocus()
+	}
+
+	AnimatedVisibility(
+		visible = visible,
+		enter = fadeIn(),
+		exit = fadeOut(),
+	) {
+		Column(
+			modifier = Modifier
+				.fillMaxWidth()
+				.background(Color(0xE6222222), RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+				.padding(horizontal = 40.dp, vertical = 20.dp),
+		) {
+			Text(
+				text = "弹幕设置",
+				color = BiliPink,
+				fontSize = 18.sp,
+				modifier = Modifier.padding(bottom = 12.dp),
+			)
+			SettingRow(
+				focusRequester = focusRequester,
+				label = "字体大小",
+				value = danmakuTextSizeLabels[textSizeIdx.coerceIn(0, danmakuTextSizeLabels.lastIndex)],
+			) { onCycle(0) }
+			SettingRow(
+				label = "速度",
+				value = danmakuSpeedLabels[speedIdx.coerceIn(0, danmakuSpeedLabels.lastIndex)],
+			) { onCycle(1) }
+			SettingRow(
+				label = "显示区域",
+				value = danmakuAreaLabels[areaIdx.coerceIn(0, danmakuAreaLabels.lastIndex)],
+			) { onCycle(2) }
+			SettingRow(
+				label = "不透明度",
+				value = "${danmakuOpacities[opacityIdx.coerceIn(0, danmakuOpacities.lastIndex)]}%",
+			) { onCycle(3) }
+			Spacer(modifier = Modifier.height(6.dp))
+			Text(
+				text = "按 OK 切换档位，返回键关闭",
+				color = Color(0x88FFFFFF),
+				fontSize = 13.sp,
+			)
+		}
+	}
+}
+
+@Composable
+private fun SettingRow(
+	focusRequester: FocusRequester? = null,
+	label: String,
+	value: String,
+	onCycle: () -> Unit,
+) {
+	var focused by remember { mutableStateOf(false) }
+	var modifier = Modifier
+		.fillMaxWidth()
+		.padding(vertical = 3.dp)
+		.background(
+			if (focused) Color(0x33FFFFFF) else Color.Transparent,
+			RoundedCornerShape(8.dp)
+		)
+		.then(
+			if (focused) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier
+		)
+		.onFocusChanged { focused = it.isFocused }
+		.focusable()
+		.onKeyEvent { event ->
+			if (event.key == Key.DirectionCenter || event.key == Key.Enter) {
+				onCycle()
+				true
+			} else false
+		}
+	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
+	Row(
+		modifier = modifier,
+		verticalAlignment = Alignment.CenterVertically,
+	) {
+		Text(text = label, color = Color.White, fontSize = 17.sp)
+		Spacer(modifier = Modifier.weight(1f))
+		Text(text = value, color = BiliPink, fontSize = 17.sp)
 	}
 }
 
@@ -159,6 +266,7 @@ private fun BottomBar(
 	onStepForward: () -> Unit,
 	onPlayNext: () -> Unit,
 	onToggleDanmaku: () -> Unit,
+	onOpenDanmakuSettings: () -> Unit,
 ) {
 	val focusRequester = remember { FocusRequester() }
 	var previewMs by remember { mutableLongStateOf(-1L) }
@@ -291,6 +399,12 @@ private fun BottomBar(
 				contentDescription = "danmaku",
 				tint = if (danmakuLoaded && danmakuVisible) BiliPink else Color.White,
 				onClick = onToggleDanmaku,
+			)
+			ControlButton(
+				icon = painterResource(R.drawable.ic_bili_danmaku_settings),
+				contentDescription = "danmaku settings",
+				tint = Color.White,
+				onClick = onOpenDanmakuSettings,
 			)
 			if (hasNext) {
 				ControlButton(
