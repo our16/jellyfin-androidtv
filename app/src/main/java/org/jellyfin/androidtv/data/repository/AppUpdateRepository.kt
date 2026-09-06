@@ -41,9 +41,11 @@ interface AppUpdateRepository {
 	val isChecking: StateFlow<Boolean>
 	val downloadProgress: StateFlow<Int> // -1 = idle, 0-100 = progress
 	val downloadMessage: StateFlow<String>
+	val downloadedApk: StateFlow<File?> // non-null = download finished, waiting for user confirmation
 
 	suspend fun checkForUpdate(): AppUpdateInfo?
 	suspend fun downloadApk(context: Context, updateInfo: AppUpdateInfo)
+	fun installDownloadedApk(context: Context)
 }
 
 class AppUpdateRepositoryImpl(
@@ -60,6 +62,7 @@ class AppUpdateRepositoryImpl(
 	override val isChecking = MutableStateFlow(false)
 	override val downloadProgress = MutableStateFlow(-1)
 	override val downloadMessage = MutableStateFlow("")
+	override val downloadedApk = MutableStateFlow<File?>(null)
 
 	private val httpClient = OkHttpClient.Builder()
 		.connectTimeout(15, TimeUnit.SECONDS)
@@ -140,7 +143,21 @@ class AppUpdateRepositoryImpl(
 			downloadSize = extractLong(json, "downloadSize") ?: extractLong(json, "DownloadSize") ?: 0,
 			checksum = extractString(json, "checksum") ?: extractString(json, "Checksum") ?: "",
 			mandatory = jsonLower.contains("\"mandatory\":true"),
+			changelog = extractChangelog(json),
 		)
+	}
+
+	/**
+	 * Parses the changelog dictionary from the Check response, e.g.
+	 * "changelog":{"zh-CN":"...","en-US":"..."}. Unescapes \n for display.
+	 */
+	private fun extractChangelog(json: String): Map<String, String> {
+		val match = Regex("\"[Cc]hangelog\"\\s*:\\s*\\{([^{}]*)\\}").find(json) ?: return emptyMap()
+		val result = mutableMapOf<String, String>()
+		Regex("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"").findAll(match.groupValues[1]).forEach {
+			result[it.groupValues[1]] = it.groupValues[2].replace("\\n", "\n").replace("\\\"", "\"")
+		}
+		return result
 	}
 
 	private fun extractString(json: String, key: String): String? =
@@ -231,10 +248,10 @@ class AppUpdateRepositoryImpl(
 					Timber.i(TAG, "Checksum verified")
 				}
 
-				// Launch installer
-				launchInstaller(context, apkFile)
-				downloadMessage.value = "安装包已准备，请确认安装"
+				// Download finished: wait for explicit user confirmation before installing
+				downloadedApk.value = apkFile
 				downloadProgress.value = -1
+				downloadMessage.value = "下载完成"
 
 			} catch (e: Exception) {
 				Timber.e(TAG, e, "Download failed")
@@ -242,6 +259,12 @@ class AppUpdateRepositoryImpl(
 				downloadProgress.value = -1
 			}
 		}
+	}
+
+	override fun installDownloadedApk(context: Context) {
+		val apk = downloadedApk.value ?: return
+		downloadMessage.value = "正在准备安装…"
+		launchInstaller(context, apk)
 	}
 
 	private fun launchInstaller(context: Context, apkFile: File) {
@@ -329,7 +352,7 @@ class AppUpdateRepositoryImpl(
 								}
 							}
 							android.content.pm.PackageInstaller.STATUS_SUCCESS -> {
-								downloadMessage.value = "安装完成"
+								downloadMessage.value = "安装完成，请重启应用生效"
 							}
 							else -> {
 								downloadMessage.value = "安装失败 (status=$status)"
