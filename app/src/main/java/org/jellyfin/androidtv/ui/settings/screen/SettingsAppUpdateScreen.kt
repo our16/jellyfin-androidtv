@@ -1,19 +1,42 @@
 package org.jellyfin.androidtv.ui.settings.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.data.repository.AppUpdateRepository
 import org.jellyfin.androidtv.ui.base.Text
@@ -36,113 +59,228 @@ fun SettingsAppUpdateScreen() {
 	val downloadProgress by updateRepository.downloadProgress.collectAsState()
 	val downloadMessage by updateRepository.downloadMessage.collectAsState()
 	val downloadedApk by updateRepository.downloadedApk.collectAsState()
+	val isInstalling by updateRepository.isInstalling.collectAsState()
 
-	SettingsColumn {
-		item {
-			ListSection(
-				headingContent = { Text("应用更新") },
-				captionContent = { Text("当前版本: ${BuildConfig.VERSION_NAME}") },
-			)
-		}
+	var showInstallConfirm by remember { mutableStateOf(false) }
 
-		item {
-			ListButton(
-				headingContent = {
-					Text(if (isChecking) "检查中..." else "检查更新")
-				},
-				captionContent = {
-					Text(downloadMessage.ifEmpty { "点击检查服务器是否有新版本" })
-				},
-				onClick = {
-					if (!isChecking) {
-						coroutineScope.launch {
-							updateRepository.checkForUpdate()
-						}
-					}
-				},
-				modifier = Modifier.fillMaxWidth()
-			)
-		}
-
-		// Update available: version info + changelog + download action
-		if (updateInfo?.updateAvailable == true && downloadedApk == null && downloadProgress == -1) {
+	Box(modifier = Modifier.fillMaxSize()) {
+		SettingsColumn {
 			item {
 				ListSection(
-					headingContent = { Text("发现新版本") },
-					captionContent = {
-						val info = updateInfo!!
-						Text("版本: ${info.appVersion}  大小: ${formatSize(info.downloadSize)}")
-					},
+					headingContent = { Text("应用更新") },
+					captionContent = { Text("当前版本: ${BuildConfig.VERSION_NAME}") },
 				)
-			}
-
-			val changelog = pickChangelog(updateInfo!!.changelog)
-			if (changelog != null) {
-				item {
-					ListSection(
-						headingContent = { Text("更新内容") },
-						captionContent = { Text(changelog) },
-					)
-				}
 			}
 
 			item {
 				ListButton(
-					headingContent = { Text("下载更新") },
-					captionContent = { Text("下载完成后需手动确认安装") },
+					headingContent = {
+						Text(if (isChecking) "检查中..." else "检查更新")
+					},
+					captionContent = {
+						Text(downloadMessage.ifEmpty { "点击检查服务器是否有新版本" })
+					},
 					onClick = {
-						coroutineScope.launch {
-							updateInfo?.let { info ->
-								updateRepository.downloadApk(context, info)
+						if (!isInstalling) {
+							coroutineScope.launch {
+								updateRepository.checkForUpdate()
 							}
 						}
 					},
 					modifier = Modifier.fillMaxWidth()
 				)
 			}
-		}
 
-		// Download progress with a visual bar
-		if (downloadProgress >= 0) {
-			item {
-				ListSection(
-					headingContent = { Text("下载进度") },
-					captionContent = { Text("$downloadProgress%") },
-				)
+			// Update available: version info + changelog + download action
+			if (updateInfo?.updateAvailable == true && downloadedApk == null && downloadProgress == -1 && !isInstalling) {
+				item {
+					ListSection(
+						headingContent = { Text("发现新版本") },
+						captionContent = {
+							val info = updateInfo!!
+							Text("版本: ${info.appVersion}  大小: ${formatSize(info.downloadSize)}")
+						},
+					)
+				}
+
+				val changelog = pickChangelog(updateInfo!!.changelog)
+				if (changelog != null) {
+					item {
+						ListSection(
+							headingContent = { Text("更新内容") },
+							captionContent = { Text(changelog) },
+						)
+					}
+				}
+
+				item {
+					ListButton(
+						headingContent = { Text("下载更新") },
+						captionContent = { Text("下载完成后需手动确认安装") },
+						onClick = {
+							coroutineScope.launch {
+								updateInfo?.let { info ->
+									updateRepository.downloadApk(context, info)
+								}
+							}
+						},
+						modifier = Modifier.fillMaxWidth()
+					)
+				}
 			}
-			item {
-				Box(
-					modifier = Modifier
-						.fillMaxWidth()
-						.padding(horizontal = 8.dp)
-						.height(8.dp)
-						.background(Color(0x33FFFFFF))
-				) {
+
+			// Download progress with a visual bar
+			if (downloadProgress >= 0) {
+				item {
+					ListSection(
+						headingContent = { Text("下载进度") },
+						captionContent = { Text("$downloadProgress%") },
+					)
+				}
+				item {
 					Box(
 						modifier = Modifier
-							.fillMaxWidth(downloadProgress / 100f)
-							.fillMaxHeight()
-							.background(UpdateAccent)
+							.fillMaxWidth()
+							.padding(horizontal = 8.dp)
+							.height(8.dp)
+							.background(Color(0x33FFFFFF))
+					) {
+						Box(
+							modifier = Modifier
+								.fillMaxWidth(downloadProgress / 100f)
+								.fillMaxHeight()
+								.background(UpdateAccent)
+						)
+					}
+				}
+			}
+
+			// Download finished: wait for explicit user confirmation to install
+			if (downloadedApk != null && !isInstalling) {
+				item {
+					ListButton(
+						headingContent = { Text("开始安装") },
+						captionContent = {
+							Text("版本 ${updateInfo?.appVersion ?: ""}  安装过程中应用会关闭")
+						},
+						onClick = { showInstallConfirm = true },
+						modifier = Modifier.fillMaxWidth()
 					)
 				}
 			}
 		}
 
-		// Download finished: wait for explicit user confirmation to install
-		if (downloadedApk != null) {
-			item {
-				ListButton(
-					headingContent = { Text("开始安装") },
-					captionContent = {
-						Text("版本 ${updateInfo?.appVersion ?: ""}  点击后将弹出系统安装确认")
-					},
-					onClick = {
-						updateRepository.installDownloadedApk(context)
-					},
-					modifier = Modifier.fillMaxWidth()
-				)
+		// Install confirmation overlay: single confirm button, warns that the app will close
+		if (showInstallConfirm && downloadedApk != null) {
+			InstallConfirmOverlay(
+				newVersion = updateInfo?.appVersion ?: "",
+				sizeBytes = updateInfo?.downloadSize ?: 0,
+				onConfirm = {
+					showInstallConfirm = false
+					updateRepository.installDownloadedApk(context)
+				},
+				onDismiss = { showInstallConfirm = false },
+			)
+		}
+
+		// Installing status: shown instead of any action buttons (the app may be killed)
+		if (isInstalling) {
+			Box(
+				modifier = Modifier
+					.fillMaxSize()
+					.background(Color(0x99000000)),
+				contentAlignment = Alignment.Center,
+			) {
+				Column(
+					horizontalAlignment = Alignment.CenterHorizontally,
+					verticalArrangement = Arrangement.spacedBy(12.dp),
+					modifier = Modifier
+						.background(Color(0xF0222222), RoundedCornerShape(12.dp))
+						.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+						.padding(horizontal = 32.dp, vertical = 24.dp),
+				) {
+					Text(text = "正在安装 ${updateInfo?.appVersion ?: ""}", color = Color.White, fontSize = 20.sp)
+					Text(
+						text = "应用即将关闭以完成更新\n安装完成后请重新打开 Catflix",
+						color = Color(0xCCFFFFFF),
+						fontSize = 16.sp,
+					)
+				}
 			}
 		}
+	}
+}
+
+@Composable
+private fun InstallConfirmOverlay(
+	newVersion: String,
+	sizeBytes: Long,
+	onConfirm: () -> Unit,
+	onDismiss: () -> Unit,
+) {
+	val confirmFocus = remember { FocusRequester() }
+	LaunchedEffect(Unit) { confirmFocus.requestFocus() }
+
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(Color(0x99000000)),
+		contentAlignment = Alignment.Center,
+	) {
+		Column(
+			horizontalAlignment = Alignment.CenterHorizontally,
+			verticalArrangement = Arrangement.spacedBy(14.dp),
+			modifier = Modifier
+				.width(420.dp)
+				.background(Color(0xF0222222), RoundedCornerShape(12.dp))
+				.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+				.padding(horizontal = 28.dp, vertical = 24.dp),
+		) {
+			Text(text = "确认安装 $newVersion", color = Color.White, fontSize = 20.sp)
+			Text(
+				text = "更新包已就绪（${formatSize(sizeBytes)}）。\n\n安装过程中应用会关闭，完成后请重新打开 Catflix。",
+				color = Color(0xCCFFFFFF),
+				fontSize = 16.sp,
+			)
+			Spacer(modifier = Modifier.height(4.dp))
+			InstallConfirmButton(
+				focusRequester = confirmFocus,
+				label = "确认安装",
+				onClick = onConfirm,
+			)
+			InstallConfirmButton(
+				focusRequester = null,
+				label = "取消",
+				onClick = onDismiss,
+			)
+		}
+	}
+}
+
+@Composable
+private fun InstallConfirmButton(
+	focusRequester: androidx.compose.ui.focus.FocusRequester?,
+	label: String,
+	onClick: () -> Unit,
+) {
+	var focused by remember { mutableStateOf(false) }
+	var modifier = Modifier
+		.width(200.dp)
+		.background(
+			if (focused) UpdateAccent else Color(0x22FFFFFF),
+			RoundedCornerShape(8.dp)
+		)
+		.onFocusChanged { focused = it.isFocused }
+		.focusable()
+		.onKeyEvent { event ->
+			if (event.type == KeyEventType.KeyUp && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {
+				onClick()
+				true
+			} else false
+		}
+	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
+	Box(modifier = modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+		Text(text = label, color = Color.White, fontSize = 17.sp)
 	}
 }
 

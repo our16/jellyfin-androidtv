@@ -42,6 +42,7 @@ interface AppUpdateRepository {
 	val downloadProgress: StateFlow<Int> // -1 = idle, 0-100 = progress
 	val downloadMessage: StateFlow<String>
 	val downloadedApk: StateFlow<File?> // non-null = download finished, waiting for user confirmation
+	val isInstalling: StateFlow<Boolean> // true after the user confirmed, app may be killed at any moment
 
 	suspend fun checkForUpdate(): AppUpdateInfo?
 	suspend fun downloadApk(context: Context, updateInfo: AppUpdateInfo)
@@ -63,6 +64,7 @@ class AppUpdateRepositoryImpl(
 	override val downloadProgress = MutableStateFlow(-1)
 	override val downloadMessage = MutableStateFlow("")
 	override val downloadedApk = MutableStateFlow<File?>(null)
+	override val isInstalling = MutableStateFlow(false)
 
 	private val httpClient = OkHttpClient.Builder()
 		.connectTimeout(15, TimeUnit.SECONDS)
@@ -301,7 +303,10 @@ class AppUpdateRepositoryImpl(
 
 	override fun installDownloadedApk(context: Context) {
 		val apk = downloadedApk.value ?: return
-		downloadMessage.value = "正在准备安装…"
+		isInstalling.value = true
+		// The system kills the app during an overwrite install: the user must be told
+		// beforehand to re-open the app afterwards, the SUCCESS broadcast may never arrive
+		downloadMessage.value = "正在安装…应用即将关闭，完成后请重新打开 Catflix"
 		launchInstaller(context, apk)
 	}
 
@@ -380,20 +385,23 @@ class AppUpdateRepositoryImpl(
 									try {
 										confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 										appContext.startActivity(confirm)
-										downloadMessage.value = "请在系统弹窗中确认安装"
+										downloadMessage.value = "请在系统弹窗中确认安装，安装过程中应用会关闭"
 									} catch (e: Exception) {
 										Timber.e(TAG, e, "Failed to launch install confirmation")
 										downloadMessage.value = "无法显示安装确认: ${e.message}"
+										isInstalling.value = false
 									}
 								} else {
 									downloadMessage.value = "安装确认不可用"
+									isInstalling.value = false
 								}
 							}
 							android.content.pm.PackageInstaller.STATUS_SUCCESS -> {
-								downloadMessage.value = "安装完成，请重启应用生效"
+								downloadMessage.value = "安装完成，请重新打开应用"
 							}
 							else -> {
 								downloadMessage.value = "安装失败 (status=$status)"
+								isInstalling.value = false
 							}
 						}
 						runCatching { appContext.unregisterReceiver(this) }
