@@ -3,11 +3,14 @@ package org.jellyfin.androidtv.data.repository
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -275,12 +278,16 @@ class AppUpdateRepositoryImpl(
 
 	/**
 	 * Streams the APK into a PackageInstaller session and commits it.
-	 * The system shows the install confirmation; on success the app is replaced
-	 * automatically. Returns false when the session could not be created.
+	 * After commit the system sends a status broadcast with STATUS_PENDING_USER_ACTION
+	 * carrying the confirmation dialog intent - the app must launch that intent itself,
+	 * otherwise no install confirmation is ever shown.
+	 * Returns false when the session could not be created.
 	 */
 	private fun installViaPackageSession(context: Context, apkFile: File): Boolean {
+		var receiver: BroadcastReceiver? = null
+		val appContext = context.applicationContext
 		return try {
-			val packageInstaller = context.packageManager.packageInstaller
+			val packageInstaller = appContext.packageManager.packageInstaller
 			val sessionParams = android.content.pm.PackageInstaller.SessionParams(
 				android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
 			)
@@ -293,13 +300,52 @@ class AppUpdateRepositoryImpl(
 					session.fsync(out)
 				}
 
-				val statusIntent = Intent(INSTALL_STATUS_ACTION).setPackage(context.packageName)
+				val statusIntent = Intent(INSTALL_STATUS_ACTION).setPackage(appContext.packageName)
 				val flags = PendingIntent.FLAG_UPDATE_CURRENT or
 					(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
-				val statusReceiver = PendingIntent.getBroadcast(context, sessionId, statusIntent, flags)
+				val statusReceiver = PendingIntent.getBroadcast(appContext, sessionId, statusIntent, flags)
+
+				receiver = object : BroadcastReceiver() {
+					override fun onReceive(ctx: Context, intent: Intent) {
+						val status = intent.getIntExtra(
+							android.content.pm.PackageInstaller.EXTRA_STATUS,
+							android.content.pm.PackageInstaller.STATUS_FAILURE
+						)
+						Timber.i(TAG, "Install status broadcast: %s", status)
+						when (status) {
+							android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+								val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+								if (confirm != null) {
+									try {
+										confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+										appContext.startActivity(confirm)
+										downloadMessage.value = "请在系统弹窗中确认安装"
+									} catch (e: Exception) {
+										Timber.e(TAG, e, "Failed to launch install confirmation")
+										downloadMessage.value = "无法显示安装确认: ${e.message}"
+									}
+								} else {
+									downloadMessage.value = "安装确认不可用"
+								}
+							}
+							android.content.pm.PackageInstaller.STATUS_SUCCESS -> {
+								downloadMessage.value = "安装完成"
+							}
+							else -> {
+								downloadMessage.value = "安装失败 (status=$status)"
+							}
+						}
+						runCatching { appContext.unregisterReceiver(this) }
+					}
+				}
+				val filter = IntentFilter(INSTALL_STATUS_ACTION)
+				ContextCompat.registerReceiver(appContext, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
 
 				session.commit(statusReceiver.intentSender)
 				Timber.i(TAG, "PackageInstaller session committed (id=$sessionId) for: $apkFile")
+			} catch (e: Exception) {
+				runCatching { receiver?.let { appContext.unregisterReceiver(it) } }
+				throw e
 			} finally {
 				session.close()
 			}
