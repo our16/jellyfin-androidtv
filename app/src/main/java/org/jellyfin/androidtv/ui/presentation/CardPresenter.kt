@@ -374,7 +374,9 @@ private fun CardViewHolderContent(
 	}
 
 	val usePreview = when (cardStyle) {
-		CARD_STYLE_TILED -> true
+		// TILED renders the title inside the card footer (see overlay below);
+		// an external title block gets clipped by the leanback row height
+		CARD_STYLE_TILED -> false
 		CARD_STYLE_LIST -> false
 		else -> displayConfig.overrideShowInfo ?: showInfo
 	}
@@ -455,7 +457,13 @@ private fun CardViewHolderContent(
 				}
 			},
 			overlay = {
-				val showInfo = !usePreview && item.showCardInfoOverlay
+				// TILED style keeps the title inside the card (bottom strip): an
+				// external text block would exceed the leanback row height and get
+				// clipped, so it is rendered as an in-image overlay instead
+				val showInfo = when (cardStyle) {
+					CARD_STYLE_TILED -> true
+					else -> !usePreview && item.showCardInfoOverlay
+				}
 				item.baseItem?.let { baseItem ->
 					ItemCardBaseItemOverlay(
 						item = baseItem,
