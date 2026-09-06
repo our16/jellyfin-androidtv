@@ -20,10 +20,17 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 	override fun onBindRowViewHolder(holder: RowPresenter.ViewHolder, item: Any) {
 		super.onBindRowViewHolder(holder, item)
 
-		// Wider gap between cards inside a row: card titles are always shown now
-		// and would be cramped/cut off with the leanback default spacing
+		// Generous gap between cards inside a row: card titles are always shown
+		// now and need unobstructed space
 		if (holder is ListRowPresenter.ViewHolder) {
-			holder.gridView.setItemSpacing((16 * holder.view.resources.displayMetrics.density).toInt())
+			holder.gridView.setItemSpacing((24 * holder.view.resources.displayMetrics.density).toInt())
+			// Never clip zoomed/focused cards or their title text
+			holder.gridView.setClipChildren(false)
+			holder.gridView.setClipToPadding(false)
+			(holder.view?.parent as? android.view.ViewGroup)?.let { parent ->
+				parent.setClipChildren(false)
+				parent.setClipToPadding(false)
+			}
 		}
 
 		val view = holder.view?.parent as? View ?: return

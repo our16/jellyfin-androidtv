@@ -221,8 +221,20 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				speedIdx = danmakuSpeedIdxState,
 				opacityIdx = danmakuOpacityIdxState,
 				areaIdx = danmakuAreaIdxState,
-				onDanmakuSettingsExpandedChange = { danmakuSettingsVisible = it },
-				onDanmakuListVisibleChange = { danmakuListVisible = it },
+				onDanmakuSettingsExpandedChange = {
+					danmakuSettingsVisible = it
+					if (!it) scheduleHideControls() else hideControlsRunnable?.let { r -> handler.removeCallbacks(r) }
+				},
+				onDanmakuListVisibleChange = {
+					danmakuListVisible = it
+					if (it) {
+						// Hide the bottom bar: the list becomes the only focusable
+						// on screen so focus always lands inside it
+						hideControls()
+					} else {
+						showControls()
+					}
+				},
 				onCycleDanmakuSetting = ::cycleDanmakuSetting,
 				onInteraction = ::scheduleHideControls,
 				onDismiss = { hideControls() },
@@ -528,13 +540,15 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	}
 
 	private fun scheduleHideControls() {
+		// Never auto-hide while the danmaku settings popup or list panel is open:
+		// just drop the pending callback entirely, it is re-scheduled on close
+		if (danmakuSettingsVisible || danmakuListVisible) {
+			hideControlsRunnable?.let { handler.removeCallbacks(it) }
+			return
+		}
 		if (hideControlsRunnable == null) {
 			hideControlsRunnable = Runnable {
-				// Never auto-hide while the danmaku settings popup or list panel is open
-				if (danmakuSettingsVisible || danmakuListVisible) {
-					scheduleHideControls()
-					return@Runnable
-				}
+				if (danmakuSettingsVisible || danmakuListVisible) return@Runnable
 				controlsVisible = false
 			}
 		}

@@ -499,13 +499,13 @@ private fun CardViewHolderContent(
 		) else Modifier
 
 		ItemPreview(
-			spacing = 6.dp,
+			spacing = 8.dp,
 			card = { card() },
 			title = title?.let { text ->
 				{
 					Text(
 						text = text,
-						maxLines = 1,
+						maxLines = 2,
 						overflow = TextOverflow.Ellipsis,
 						textAlign = TextAlign.Center,
 						color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,

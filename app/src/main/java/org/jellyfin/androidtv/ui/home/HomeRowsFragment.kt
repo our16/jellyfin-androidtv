@@ -131,7 +131,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 				// Vertical spacing between home rows (titles are always shown on cards now)
 				view?.post {
-					verticalGridView?.setItemSpacing((16 * resources.displayMetrics.density).toInt())
+					verticalGridView?.setItemSpacing((24 * resources.displayMetrics.density).toInt())
 				}
 
 				// Add rows in order
