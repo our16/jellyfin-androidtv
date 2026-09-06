@@ -48,6 +48,7 @@ public class KeyProcessor {
     public static final int MENU_INSTANT_MIX = 11;
     public static final int MENU_CLEAR_QUEUE = 12;
     public static final int MENU_TOGGLE_SHUFFLE = 13;
+    public static final int MENU_SHOW_DETAILS = 14;
 
     private final Lazy<MediaManager> mediaManager = KoinJavaComponent.<MediaManager>inject(MediaManager.class);
     private final Lazy<NavigationRepository> navigationRepository = KoinJavaComponent.<NavigationRepository>inject(NavigationRepository.class);
@@ -203,6 +204,8 @@ public class KeyProcessor {
                 menu.getMenu().add(0, MENU_CLEAR_QUEUE, order++, R.string.lbl_clear_queue);
             }
         } else {
+            // Details entry (long-press OK / menu key) since items now play directly on click
+            menu.getMenu().add(0, MENU_SHOW_DETAILS, order++, R.string.lbl_details);
             boolean isFolder = item.isFolder() != null && item.isFolder();
             if (BaseItemExtensionsKt.canPlay(item)) {
                 if (isFolder
@@ -285,6 +288,9 @@ public class KeyProcessor {
         @Override
         public boolean onMenuItemClick(MenuItem menuItem) {
             switch (menuItem.getItemId()) {
+                case MENU_SHOW_DETAILS:
+                    navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(item.getId()));
+                    return true;
                 case MENU_PLAY:
                     playbackHelper.getValue().retrieveAndPlay(item.getId(), false, activity);
                     return true;

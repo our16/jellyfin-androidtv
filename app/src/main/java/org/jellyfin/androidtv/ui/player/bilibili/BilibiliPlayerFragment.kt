@@ -613,8 +613,9 @@ class BilibiliPlayerFragment : Fragment() {
 	private fun reportStartInternal() {
 		val item = currentItem ?: return
 		val stream = currentStreamInfo ?: return
+		// ReportingHelper expects ticks (1 ms = 10_000 ticks), same as the legacy player
 		reportingHelper.reportStart(
-			viewLifecycleOwner, null, item, stream, player?.currentPosition ?: startPositionMs, false
+			viewLifecycleOwner, null, item, stream, (player?.currentPosition ?: startPositionMs) * 10_000, false
 		)
 	}
 
@@ -623,14 +624,14 @@ class BilibiliPlayerFragment : Fragment() {
 		val item = currentItem ?: return
 		val stream = currentStreamInfo ?: return
 		reportingHelper.reportProgress(
-			viewLifecycleOwner, null, item, stream, player?.currentPosition ?: 0, player?.isPlaying == false
+			viewLifecycleOwner, null, item, stream, (player?.currentPosition ?: 0) * 10_000, player?.isPlaying == false
 		)
 	}
 
 	private fun reportStopInternal() {
 		val item = currentItem ?: return
 		val stream = currentStreamInfo ?: return
-		reportingHelper.reportStopped(viewLifecycleOwner, item, stream, player?.currentPosition)
+		reportingHelper.reportStopped(viewLifecycleOwner, item, stream, player?.currentPosition?.times(10_000))
 	}
 
 	private fun startProgressReportLoop() {

@@ -141,6 +141,23 @@ public class ItemLauncher {
                         }
 
                         return;
+                    case MOVIE:
+                    case VIDEO:
+                    case TRAILER:
+                        // Play movies/videos directly with resume position; long-press (menu key) opens the details page
+                        final BaseItemDto videoItem = baseItem;
+                        playbackHelper.getValue().getItemsToPlay(context, baseItem, false, false, new Response<List<BaseItemDto>>() {
+                            @Override
+                            public void onResponse(List<BaseItemDto> response) {
+                                if (!isActive()) return;
+                                long positionTicks = videoItem.getUserData() != null ? videoItem.getUserData().getPlaybackPositionTicks() : 0;
+                                int startPos = (int) (positionTicks / 10000);
+                                if (startPos > 0) startPos = Math.max(0, startPos - 30000); // 30s resume preroll
+                                playbackLauncher.getValue().launch(context, response, startPos, false, 0);
+                            }
+                        });
+                        return;
+
                     case SEASON:
                         navigationRepository.getValue().navigate(Destinations.INSTANCE.folderBrowser(baseItem));
                         return;

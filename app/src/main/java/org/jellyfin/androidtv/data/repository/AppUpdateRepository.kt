@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.data.repository
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -49,6 +50,7 @@ class AppUpdateRepositoryImpl(
 	companion object {
 		private const val NOTIFICATION_CHANNEL_ID = "app_update"
 		private const val TAG = "AppUpdate"
+		private const val INSTALL_STATUS_ACTION = "org.jellyfin.androidtv.action.INSTALL_STATUS"
 	}
 
 	override val updateInfo = MutableStateFlow<AppUpdateInfo?>(null)
@@ -240,6 +242,13 @@ class AppUpdateRepositoryImpl(
 	}
 
 	private fun launchInstaller(context: Context, apkFile: File) {
+		// Preferred: in-app PackageInstaller session (no file manager involved,
+		// system install confirmation is shown directly after the download)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && installViaPackageSession(context, apkFile)) {
+			return
+		}
+
+		// Fallback: ACTION_VIEW via FileProvider
 		try {
 			val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 				androidx.core.content.FileProvider.getUriForFile(
@@ -256,11 +265,49 @@ class AppUpdateRepositoryImpl(
 				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 				addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 			}
-			Timber.i(TAG, "Launching installer for: $apkFile")
+			Timber.i(TAG, "Launching installer via ACTION_VIEW for: $apkFile")
 			context.startActivity(intent)
 		} catch (e: Exception) {
 			Timber.e(TAG, e, "Failed to launch installer")
 			downloadMessage.value = "无法启动安装程序"
+		}
+	}
+
+	/**
+	 * Streams the APK into a PackageInstaller session and commits it.
+	 * The system shows the install confirmation; on success the app is replaced
+	 * automatically. Returns false when the session could not be created.
+	 */
+	private fun installViaPackageSession(context: Context, apkFile: File): Boolean {
+		return try {
+			val packageInstaller = context.packageManager.packageInstaller
+			val sessionParams = android.content.pm.PackageInstaller.SessionParams(
+				android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+			)
+			val sessionId = packageInstaller.createSession(sessionParams)
+			val session = packageInstaller.openSession(sessionId)
+
+			try {
+				session.openWrite("jellyfin_update.apk", 0, apkFile.length()).use { out ->
+					apkFile.inputStream().use { input -> input.copyTo(out) }
+					session.fsync(out)
+				}
+
+				val statusIntent = Intent(INSTALL_STATUS_ACTION).setPackage(context.packageName)
+				val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+					(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+				val statusReceiver = PendingIntent.getBroadcast(context, sessionId, statusIntent, flags)
+
+				session.commit(statusReceiver.intentSender)
+				Timber.i(TAG, "PackageInstaller session committed (id=$sessionId) for: $apkFile")
+			} finally {
+				session.close()
+			}
+			true
+		} catch (e: Exception) {
+			Timber.e(TAG, e, "PackageInstaller session failed, falling back to ACTION_VIEW")
+			downloadMessage.value = "应用内安装不可用，尝试其他方式…"
+			false
 		}
 	}
 

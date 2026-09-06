@@ -101,7 +101,7 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
     private Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
     private Lazy<MarkdownRenderer> markdownRenderer = inject(MarkdownRenderer.class);
     private final Lazy<CustomMessageRepository> customMessageRepository = inject(CustomMessageRepository.class);
-    private final Lazy<NavigationRepository> navigationRepository = inject(NavigationRepository.class);
+    protected final Lazy<NavigationRepository> navigationRepository = inject(NavigationRepository.class);
     private final Lazy<ApiClient> api = inject(ApiClient.class);
     private final Lazy<ItemLauncher> itemLauncher = inject(ItemLauncher.class);
     private final Lazy<KeyProcessor> keyProcessor = inject(KeyProcessor.class);
@@ -346,6 +346,9 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if (event.getAction() != KeyEvent.ACTION_UP) return false;
+        // Season page: menu key toggles episode sort order (ascending 1,2,3 / descending 5,4,3)
+        if (this instanceof GenericFolderFragment && keyCode == KeyEvent.KEYCODE_MENU
+                && ((GenericFolderFragment) this).toggleEpisodeSort()) return true;
         return keyProcessor.getValue().handleKey(keyCode, mCurrentItem, requireActivity());
     }
 

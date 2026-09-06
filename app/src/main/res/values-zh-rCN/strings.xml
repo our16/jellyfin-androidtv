@@ -142,6 +142,9 @@
     <string name="lbl_danmaku">弹幕</string>
     <string name="msg_danmaku_not_loaded">该视频暂无弹幕</string>
     <string name="lbl_danmaku_settings">弹幕设置</string>
+    <string name="lbl_details">详情</string>
+    <string name="msg_episode_sort_asc">剧集顺序：1,2,3…（正序）</string>
+    <string name="msg_episode_sort_desc">剧集顺序：最新在前（倒序）</string>
     <string name="desc_bitstream_ac3">需要有能力的硬件</string>
     <string name="lbl_bitstream_ac3">比特流杜比数字音频</string>
     <string name="desc_automatic_fav_songs">喜爱歌曲的自动播放列表</string>
