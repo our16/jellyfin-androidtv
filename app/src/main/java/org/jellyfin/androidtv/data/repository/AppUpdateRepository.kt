@@ -309,17 +309,14 @@ class AppUpdateRepositoryImpl(
 	}
 
 	private fun launchInstaller(context: Context, apkFile: File) {
-		// Preferred: in-app PackageInstaller session (no file manager involved,
-		// system install confirmation is shown directly after the download)
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && installViaPackageSession(context, apkFile)) {
-			return
-		}
+		val appContext = context.applicationContext
 
-		// Fallback: ACTION_VIEW via FileProvider
+		// Preferred: ACTION_VIEW via FileProvider - this opens the same system installer UI
+		// that manual APK installs use, which is known to work on this device.
 		try {
 			val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 				androidx.core.content.FileProvider.getUriForFile(
-					context,
+					appContext,
 					"${BuildConfig.APPLICATION_ID}.fileprovider",
 					apkFile
 				)
@@ -333,10 +330,16 @@ class AppUpdateRepositoryImpl(
 				addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 			}
 			Timber.i(TAG, "Launching installer via ACTION_VIEW for: $apkFile")
-			context.startActivity(intent)
+			downloadMessage.value = "请在系统弹窗中确认安装，安装过程中应用会关闭"
+			appContext.startActivity(intent)
+			return
 		} catch (e: Exception) {
-			Timber.e(TAG, e, "Failed to launch installer")
-			downloadMessage.value = "无法启动安装程序"
+			Timber.e(TAG, e, "ACTION_VIEW install failed, trying PackageInstaller session")
+		}
+
+		// Fallback: PackageInstaller session (status handled by the static InstallStatusReceiver)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			installViaPackageSession(appContext, apkFile)
 		}
 	}
 
@@ -367,8 +370,9 @@ class AppUpdateRepositoryImpl(
 				// Targets the static InstallStatusReceiver, which survives process death
 				val statusIntent = Intent(org.jellyfin.androidtv.InstallStatusReceiver.INSTALL_STATUS_ACTION)
 					.setPackage(appContext.packageName)
-				val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-					(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+				// PackageInstaller attaches extras to this PendingIntent: it must be MUTABLE
+				// (FLAG_MUTABLE is a no-op below API 31 where PendingIntents are mutable by default)
+				val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
 				val statusReceiver = PendingIntent.getBroadcast(appContext, sessionId, statusIntent, flags)
 
 				session.commit(statusReceiver.intentSender)

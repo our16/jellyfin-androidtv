@@ -40,8 +40,7 @@ class InstallStatusReceiver : BroadcastReceiver() {
 				}
 			}
 			PackageInstaller.STATUS_SUCCESS -> {
-				// MY_PACKAGE_REPLACED receiver handles the automatic relaunch
-				Timber.i("Install succeeded")
+				Toast.makeText(context, "安装成功，正在重启…", Toast.LENGTH_LONG).show()
 			}
 			else -> {
 				Timber.e("Install failed with status %s", status)
