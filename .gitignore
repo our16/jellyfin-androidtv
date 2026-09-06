@@ -10,4 +10,4 @@ captures/
 
 # Signing keys - never commit
 keystore/
-*.hprof
+*.hprofhs_err_pid*.log
