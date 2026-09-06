@@ -40,6 +40,9 @@ public class DrawTask implements IDrawTask {
 
     protected IDanmakus danmakuList;
 
+    // Diagnostics: size and time range of the loaded danmaku collection
+    public static volatile String listDiag = "list=?";
+
     protected BaseDanmakuParser mParser;
 
     TaskListener mTaskListener;
@@ -334,6 +337,19 @@ public class DrawTask implements IDrawTask {
         mContext.mGlobalFlagValues.resetAll();
         if(danmakuList != null) {
             mLastDanmaku = danmakuList.last();
+        }
+        // Diagnostics: collection size and time range actually handed to the renderer
+        try {
+            if (danmakuList == null || danmakuList.isEmpty()) {
+                listDiag = "list=EMPTY";
+            } else {
+                BaseDanmaku first = danmakuList.first();
+                BaseDanmaku last = danmakuList.last();
+                listDiag = "list=" + danmakuList.size() + " [" + (first == null ? "?" : first.getTime())
+                        + ".." + (last == null ? "?" : last.getTime()) + "]";
+            }
+        } catch (Exception e) {
+            listDiag = "list=ERR";
         }
     }
 

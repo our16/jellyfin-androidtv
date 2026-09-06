@@ -646,6 +646,10 @@ class BilibiliPlayerFragment : Fragment() {
 			try {
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)
+				// Experimental fix: bypass CacheManagingDrawTask (its build-cache thread
+				// previously crashed with NPE and may silently produce empty caches);
+				// plain DrawTask renders text directly and is much simpler.
+				view.enableDanmakuDrawingCache(false)
 				val parser = JellyfinDanmakuParser()
 				manager.onEnginePrepared = {
 					// Called on the main thread (posted) after the engine thread finished
@@ -673,7 +677,8 @@ class BilibiliPlayerFragment : Fragment() {
 						delay(600)
 						val count = runCatching { parser.getDanmakus().size() }.getOrDefault(-1)
 						val state = runCatching { manager.getDiagnostics() }.getOrDefault("diag-error") +
-								" count=$count"
+								" count=$count " +
+								master.flame.danmaku.controller.DrawTask.listDiag
 						if (state != last) {
 							last = state
 							seekHintState = state
