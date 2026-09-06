@@ -40,7 +40,8 @@ public class DanmakuRenderer extends Renderer {
     public static volatile int diagShownCount;
 
     public static String getSkipDiag() {
-        return "off=" + diagOffsetSkip
+        return "tmo=" + diagTimeoutSkip
+                + " off=" + diagOffsetSkip
                 + " srt=" + diagStartRenderSkip
                 + " late=" + diagLateBreak
                 + " filt=" + diagFilterSkip
