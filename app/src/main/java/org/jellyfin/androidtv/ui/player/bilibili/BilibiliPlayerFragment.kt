@@ -231,9 +231,12 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				onDanmakuListVisibleChange = {
 					danmakuListVisible = it
 					if (it) {
-						// Start at the top and hide the bottom bar: the list becomes
-						// the only focusable on screen so focus always lands inside it
-						danmakuListIndex = 0
+						// Jump straight to the danmaku matching the current playback
+						// position (first entry not yet shown), instead of the top
+						val pos = positionState
+						danmakuListIndex = danmakuEntriesState.indexOfFirst { e -> e.timeMs >= pos }
+							.takeIf { idx -> idx >= 0 }
+							?: (danmakuEntriesState.size - 1).coerceAtLeast(0)
 						hideControls()
 					} else {
 						showControls()
@@ -738,13 +741,18 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	private fun loadDanmaku(item: BaseItemDto) {
 		viewLifecycleOwner.lifecycleScope.launch {
 			// The danmaku view is created inside a Compose AndroidView factory;
-			// wait until it exists before handing it to the danmaku engine
-			val view: DanmakuTextureView = withTimeoutOrNull(5000) {
+			// on slower TVs the first player session can take longer than any
+			// fixed timeout (video init hogs the main thread), so wait without
+			// giving up - the coroutine is cancelled with the view lifecycle
+			val view: DanmakuTextureView = run {
 				while (danmakuView == null) delay(50)
-				danmakuView
-			} ?: run {
-				Timber.w("Danmaku view not available in time")
-				return@launch
+				val v = danmakuView!!
+				// Also wait for the texture surface so the very first session
+				// renders instead of silently drawing to a missing surface
+				withTimeoutOrNull(8000) {
+					while (!v.isViewReady()) delay(50)
+				}
+				v
 			}
 
 			var xml = runCatching { danmakuApi.getDanmakuRaw(item.id.toString()) }.getOrNull()
