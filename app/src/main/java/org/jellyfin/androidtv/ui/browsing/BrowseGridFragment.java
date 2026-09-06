@@ -151,10 +151,10 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         mGridDirection = libraryPreferences.get(LibraryPreferences.Companion.getGridDirection());
         mCardFocusScale = getResources().getFraction(R.fraction.card_scale_focus, 1, 1);
 
-        if (mGridDirection.equals(GridDirection.VERTICAL))
-            setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_LARGE, false));
-        else
-            setGridPresenter(new HorizontalGridPresenter());
+        // Always use the horizontal (row-first) grid: items fill 1,2,3,4 across
+        // then wrap to the next row - the vertical grid fills column-first which
+        // reads as 1,4,7 / 2,5,8 / 3,6,9 and is confusing for browsing
+        setGridPresenter(new HorizontalGridPresenter());
 
         sortOptions = new HashMap<>();
         {
@@ -584,9 +584,9 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             mPosterSizeSetting = posterSizeSetting;
             mGridDirection = gridDirection;
 
-            if (mGridDirection.equals(GridDirection.VERTICAL) && (mGridPresenter == null || !(mGridPresenter instanceof VerticalGridPresenter))) {
-                setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_LARGE, false));
-            } else if (mGridDirection.equals(GridDirection.HORIZONTAL) && (mGridPresenter == null || !(mGridPresenter instanceof HorizontalGridPresenter))) {
+            // Always keep the horizontal (row-first) grid regardless of the stored
+            // grid direction preference - see the note in onCreate
+            if (mGridPresenter == null || !(mGridPresenter instanceof HorizontalGridPresenter)) {
                 setGridPresenter(new HorizontalGridPresenter());
             }
             setDefaultGridRowCols(mPosterSizeSetting, mImageType);
