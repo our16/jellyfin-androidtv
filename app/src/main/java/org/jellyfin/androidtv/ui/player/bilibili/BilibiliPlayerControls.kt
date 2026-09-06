@@ -42,8 +42,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -227,7 +229,8 @@ private fun BottomBar(
 				.onKeyEvent { event ->
 					when (event.key) {
 						Key.DirectionLeft -> {
-							if (durationMs > 0) {
+							// trigger on KeyDown (incl. long-press repeats), ignore the matching KeyUp
+							if (event.type == KeyEventType.KeyDown && durationMs > 0) {
 								previewMs = ((if (previewMs < 0) positionMs else previewMs) - 10_000L)
 									.coerceIn(0L, durationMs)
 								onInteraction()
@@ -235,7 +238,7 @@ private fun BottomBar(
 							true
 						}
 						Key.DirectionRight -> {
-							if (durationMs > 0) {
+							if (event.type == KeyEventType.KeyDown && durationMs > 0) {
 								previewMs = ((if (previewMs < 0) positionMs else previewMs) + 10_000L)
 									.coerceIn(0L, durationMs)
 								onInteraction()
@@ -243,7 +246,8 @@ private fun BottomBar(
 							true
 						}
 						Key.DirectionCenter, Key.Enter -> {
-							if (previewMs >= 0) {
+							// trigger on KeyUp only, otherwise one press fires the action twice
+							if (event.type == KeyEventType.KeyUp && previewMs >= 0) {
 								onSeekTo(previewMs)
 								previewMs = -1
 								onInteraction()
@@ -438,7 +442,8 @@ private fun SettingRow(
 		.onKeyEvent { event ->
 			when (event.key) {
 				Key.DirectionCenter, Key.Enter -> {
-					onCycle()
+					// KeyUp only: one press = one preset cycle
+					if (event.type == KeyEventType.KeyUp) onCycle()
 					true
 				}
 				Key.DirectionLeft, Key.DirectionRight -> {
@@ -447,7 +452,7 @@ private fun SettingRow(
 				}
 				Key.DirectionUp, Key.DirectionDown -> false
 				Key.Back -> {
-					onDismiss()
+					if (event.type == KeyEventType.KeyUp) onDismiss()
 					true
 				}
 				else -> false
@@ -486,7 +491,9 @@ private fun ControlButton(
 			.onFocusChanged { focused = it.isFocused }
 			.focusable()
 			.onKeyEvent { event ->
-				if (event.key == Key.DirectionCenter || event.key == Key.Enter) {
+				if (event.type == KeyEventType.KeyUp &&
+					(event.key == Key.DirectionCenter || event.key == Key.Enter)
+				) {
 					onClick()
 					true
 				} else false

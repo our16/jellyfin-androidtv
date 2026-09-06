@@ -325,8 +325,15 @@ class BilibiliPlayerFragment : Fragment() {
 				}
 				KeyEvent.KEYCODE_DPAD_CENTER,
 				KeyEvent.KEYCODE_ENTER,
-				KeyEvent.KEYCODE_DPAD_DOWN,
 				KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+					if (isUp) {
+						togglePlayPause()
+						// give visual feedback: show controls when pausing so the state is obvious
+						if (player?.isPlaying == false) showControls()
+					}
+					true
+				}
+				KeyEvent.KEYCODE_DPAD_DOWN -> {
 					if (isUp) showControls()
 					true
 				}
