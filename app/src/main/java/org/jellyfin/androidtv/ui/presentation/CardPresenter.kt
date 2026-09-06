@@ -1,16 +1,27 @@
 package org.jellyfin.androidtv.ui.presentation
 
+import android.content.Context
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -18,6 +29,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -27,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -65,7 +80,10 @@ class CardPresenter(
 	constructor(showInfo: Boolean) : this(showInfo, 150)
 	constructor() : this(true)
 
+	private var cardStyle = -1
+
 	override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+		if (cardStyle < 0) cardStyle = getCardStyle(parent.context)
 		val view = ComposeView(parent.context).apply {
 			setParentCompositionContext(parent.findViewTreeCompositionContext())
 			setViewTreeLifecycleOwner(parent.findViewTreeLifecycleOwner())
@@ -110,6 +128,7 @@ class CardPresenter(
 					imageType = imageType,
 					staticHeight = staticHeight,
 					uniformAspect = uniformAspect,
+					cardStyle = cardStyle,
 				)
 			}
 
@@ -151,6 +170,35 @@ private val LANDSCAPE_CONTENT_TYPES = setOf(
 	BaseItemKind.PLAYLIST,
 	BaseItemKind.PHOTO_ALBUM,
 )
+
+/** Card styles for media browsing, cycled with the menu key */
+const val CARD_STYLE_FOCUS = 0
+const val CARD_STYLE_TILED = 1
+const val CARD_STYLE_LIST = 2
+
+private const val CARD_STYLE_PREFS = "browse_prefs"
+private const val CARD_STYLE_KEY = "card_style"
+
+fun getCardStyle(context: Context): Int =
+	context.getSharedPreferences(CARD_STYLE_PREFS, Context.MODE_PRIVATE).getInt(CARD_STYLE_KEY, CARD_STYLE_TILED)
+
+/**
+ * Cycle between the card styles and persist the choice.
+ * @return the new style
+ */
+fun toggleCardStyle(context: Context): Int {
+	val prefs = context.getSharedPreferences(CARD_STYLE_PREFS, Context.MODE_PRIVATE)
+	val next = (prefs.getInt(CARD_STYLE_KEY, CARD_STYLE_TILED) + 1) % 3
+	prefs.edit().putInt(CARD_STYLE_KEY, next).apply()
+	val resId = when (next) {
+		CARD_STYLE_FOCUS -> R.string.msg_card_style_focus
+		CARD_STYLE_LIST -> R.string.msg_card_style_list
+		else -> R.string.msg_card_style_tiled
+	}
+	Toast.makeText(context, resId, Toast.LENGTH_SHORT).show()
+	return next
+}
+
 
 private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
 	BaseRowType.BaseItem -> {
@@ -305,6 +353,7 @@ private fun CardViewHolderContent(
 	imageType: ImageType,
 	staticHeight: Int,
 	uniformAspect: Boolean,
+	cardStyle: Int,
 ) {
 	val context = LocalContext.current
 	val localDensity = LocalDensity.current
@@ -324,7 +373,51 @@ private fun CardViewHolderContent(
 		else -> DpSize(150.dp * aspectRatio, 150.dp)
 	}
 
-	val usePreview = displayConfig.overrideShowInfo ?: showInfo
+	val usePreview = when (cardStyle) {
+		CARD_STYLE_TILED -> true
+		CARD_STYLE_LIST -> false
+		else -> displayConfig.overrideShowInfo ?: showInfo
+	}
+
+	if (cardStyle == CARD_STYLE_LIST) {
+		ItemListRow(
+			focused = focused,
+			title = title,
+			subtitle = subtitle,
+			modifier = Modifier.size(DpSize(360.dp, 84.dp)),
+			image = {
+				if (image != null) {
+					val api = koinInject<ApiClient>()
+					AsyncImage(
+						url = image.getUrl(
+							api,
+							maxWidth = with(localDensity) { 140.dp.roundToPx() },
+							maxHeight = with(localDensity) { 84.dp.roundToPx() },
+						),
+						blurHash = image.blurHash,
+						aspectRatio = aspectRatio,
+						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
+						modifier = Modifier.fillMaxSize(),
+					)
+				} else if (item is GridButtonBaseRowItem && item.gridButton.imageRes != null) {
+					Image(
+						painter = painterResource(item.gridButton.imageRes),
+						contentDescription = null,
+						modifier = Modifier.fillMaxSize(),
+					)
+				} else {
+					Image(
+						painter = painterResource(displayConfig.iconRes),
+						contentDescription = null,
+						modifier = Modifier
+							.fillMaxSize(0.45f)
+							.align(Alignment.Center),
+					)
+				}
+			},
+		)
+		return
+	}
 
 	val card = @Composable {
 		ItemCard(
@@ -433,5 +526,61 @@ private fun CardViewHolderContent(
 		)
 	} else {
 		card()
+	}
+}
+
+/**
+ * List-style media row: thumbnail on the left, title and info on the right.
+ * Used by the CARD_STYLE_LIST browsing style.
+ */
+@Composable
+@Stable
+private fun ItemListRow(
+	focused: Boolean,
+	title: String?,
+	subtitle: String?,
+	modifier: Modifier = Modifier,
+	image: @Composable (BoxScope.() -> Unit),
+) {
+	Row(
+		modifier = modifier
+			.clip(JellyfinTheme.shapes.medium)
+			.background(if (focused) JellyfinTheme.colorScheme.focusedSurface else JellyfinTheme.colorScheme.surface)
+			.border(if (focused) 3.dp else 1.dp, if (focused) Color.White else Color(0x22FFFFFF)),
+	) {
+		Box(
+			modifier = Modifier
+				.fillMaxHeight()
+				.width(140.dp),
+			contentAlignment = Alignment.Center,
+		) {
+			image()
+		}
+
+		Column(
+			modifier = Modifier
+				.weight(1f)
+				.fillMaxHeight()
+				.padding(horizontal = 14.dp, vertical = 10.dp),
+			verticalArrangement = Arrangement.Center,
+		) {
+			Text(
+				text = title.orEmpty(),
+				color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,
+				fontSize = 15.sp,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis,
+			)
+			if (!subtitle.isNullOrBlank()) {
+				Spacer(modifier = Modifier.height(3.dp))
+				Text(
+					text = subtitle,
+					color = Tokens.Color.colorGrey300,
+					fontSize = 12.sp,
+					maxLines = 1,
+					overflow = TextOverflow.Ellipsis,
+				)
+			}
+		}
 	}
 }

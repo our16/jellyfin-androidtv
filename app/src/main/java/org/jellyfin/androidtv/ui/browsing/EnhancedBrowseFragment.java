@@ -44,10 +44,12 @@ import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapterHelperKt;
+import org.jellyfin.androidtv.ui.navigation.Destination;
 import org.jellyfin.androidtv.ui.navigation.Destinations;
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.ui.presentation.CardPresenter;
+import org.jellyfin.androidtv.ui.presentation.CardPresenterKt;
 import org.jellyfin.androidtv.ui.presentation.GridButtonPresenter;
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter;
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter;
@@ -349,7 +351,15 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
         // Season page: menu key toggles episode sort order (ascending 1,2,3 / descending 5,4,3)
         if (this instanceof GenericFolderFragment && keyCode == KeyEvent.KEYCODE_MENU
                 && ((GenericFolderFragment) this).toggleEpisodeSort()) return true;
-        return keyProcessor.getValue().handleKey(keyCode, mCurrentItem, requireActivity());
+        // Menu key elsewhere: cycle the media card display style (tiled / list / focus-only)
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            CardPresenterKt.toggleCardStyle(requireContext());
+            Destination destination = mFolder != null
+                    ? Destinations.INSTANCE.folderBrowser(mFolder)
+                    : Destinations.INSTANCE.getHome();
+            navigationRepository.getValue().navigate(destination, true);
+            return true;
+        }        return keyProcessor.getValue().handleKey(keyCode, mCurrentItem, requireActivity());
     }
 
     private void refreshCurrentItem() {

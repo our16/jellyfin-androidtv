@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.modifier.autoFocus
 
 val BiliPink = Color(0xFFFB7299)
 
@@ -75,6 +79,8 @@ fun BilibiliPlayerControls(
 	bufferedMs: Long,
 	danmakuVisible: Boolean,
 	danmakuLoaded: Boolean,
+	danmakuEntries: List<DanmakuListEntry>,
+	danmakuListVisible: Boolean,
 	hasNext: Boolean,
 	seekHint: String?,
 	danmakuSettingsExpanded: Boolean,
@@ -83,6 +89,7 @@ fun BilibiliPlayerControls(
 	opacityIdx: Int,
 	areaIdx: Int,
 	onDanmakuSettingsExpandedChange: (Boolean) -> Unit,
+	onDanmakuListVisibleChange: (Boolean) -> Unit,
 	onCycleDanmakuSetting: (Int) -> Unit,
 	onInteraction: () -> Unit,
 	onDismiss: () -> Unit,
@@ -123,9 +130,34 @@ fun BilibiliPlayerControls(
 				opacityIdx = opacityIdx,
 				areaIdx = areaIdx,
 				onCycle = onCycleDanmakuSetting,
+				onOpenList = {
+					onDanmakuSettingsExpandedChange(false)
+					onDanmakuListVisibleChange(true)
+				},
 				onInteraction = onInteraction,
 				onDismiss = { onDanmakuSettingsExpandedChange(false) },
 				modifier = Modifier.align(Alignment.BottomEnd),
+			)
+		}
+
+		// Danmaku list side panel (right side of the screen)
+		if (danmakuListVisible) {
+			DanmakuListPanel(
+				entries = danmakuEntries,
+				onClose = { onDanmakuListVisibleChange(false) },
+				onInteraction = onInteraction,
+				modifier = Modifier
+					.align(Alignment.CenterEnd)
+					.padding(end = 24.dp),
+			)
+		}
+
+		// Central play button while paused: gives focus a clear target so the
+		// progress bar does not swallow OK presses while paused
+		if (visible && !isPlaying && !isBuffering && !danmakuSettingsExpanded && !danmakuListVisible) {
+			CentralPlayButton(
+				onClick = onTogglePlay,
+				modifier = Modifier.align(Alignment.Center),
 			)
 		}
 
@@ -225,6 +257,12 @@ private fun BottomBar(
 
 	LaunchedEffect(Unit) {
 		focusRequester.requestFocus()
+	}
+
+	// When playback resumes the central play button disappears - pull focus back
+	// to the progress bar so remote navigation keeps working
+	LaunchedEffect(isPlaying) {
+		if (isPlaying) focusRequester.requestFocus()
 	}
 
 	val displayPos = if (previewMs >= 0) previewMs else positionMs
@@ -373,6 +411,7 @@ private fun DanmakuSettingsPopup(
 	opacityIdx: Int,
 	areaIdx: Int,
 	onCycle: (Int) -> Unit,
+	onOpenList: () -> Unit,
 	onInteraction: () -> Unit,
 	onDismiss: () -> Unit,
 	modifier: Modifier = Modifier,
@@ -412,6 +451,13 @@ private fun DanmakuSettingsPopup(
 			label = "不透明度",
 			value = "${danmakuOpacities[opacityIdx.coerceIn(0, danmakuOpacities.lastIndex)]}%",
 			onCycle = { onCycle(3); onInteraction() },
+			onDismiss = onDismiss,
+		)
+		// Opens the danmaku list side panel
+		SettingRow(
+			label = "弹幕列表",
+			value = "→",
+			onCycle = onOpenList,
 			onDismiss = onDismiss,
 		)
 	}
@@ -465,6 +511,151 @@ private fun SettingRow(
 		Text(text = label, color = Color.White, fontSize = 15.sp)
 		Spacer(modifier = Modifier.weight(1f))
 		Text(text = value, color = BiliPink, fontSize = 15.sp)
+	}
+}
+
+@Composable
+private fun DanmakuListPanel(
+	entries: List<DanmakuListEntry>,
+	onClose: () -> Unit,
+	onInteraction: () -> Unit,
+	modifier: Modifier = Modifier,
+) {
+	val focusRequester = remember { FocusRequester() }
+	LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+	Column(
+		modifier = modifier
+			.width(430.dp)
+			.fillMaxHeight(0.72f)
+			.background(Color(0xE6111111), RoundedCornerShape(12.dp))
+			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+			.focusGroup()
+			.padding(10.dp),
+	) {
+		Row(
+			modifier = Modifier
+				.fillMaxWidth()
+				.padding(bottom = 6.dp),
+			verticalAlignment = Alignment.CenterVertically,
+		) {
+			Text(text = "弹幕列表 (${entries.size})", color = Color.White, fontSize = 16.sp)
+			Spacer(modifier = Modifier.weight(1f))
+			Text(text = "按返回关闭", color = Color(0x88FFFFFF), fontSize = 12.sp)
+		}
+
+		if (entries.isEmpty()) {
+			Text(
+				text = "暂无弹幕",
+				color = Color(0x88FFFFFF),
+				fontSize = 14.sp,
+				modifier = Modifier.padding(top = 20.dp).align(Alignment.CenterHorizontally),
+			)
+		} else {
+			LazyColumn(modifier = Modifier.fillMaxSize()) {
+				itemsIndexed(entries, key = { _, e -> "${e.timeMs}-${e.text.hashCode()}" }) { _, entry ->
+					DanmakuListRow(
+						entry = entry,
+						onInteraction = onInteraction,
+						focusRequester = if (entry === entries.firstOrNull()) focusRequester else null,
+					)
+				}
+			}
+		}
+	}
+}
+
+@Composable
+private fun DanmakuListRow(
+	entry: DanmakuListEntry,
+	onInteraction: () -> Unit,
+	focusRequester: FocusRequester?,
+) {
+	var focused by remember { mutableStateOf(false) }
+	var modifier = Modifier
+		.fillMaxWidth()
+		.padding(horizontal = 2.dp, vertical = 2.dp)
+		.background(if (focused) Color(0x30FB7299) else Color.Transparent, RoundedCornerShape(8.dp))
+		.then(if (focused) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier)
+		.onFocusChanged { focused = it.isFocused }
+		.focusable()
+		.onKeyEvent { event ->
+			when (event.key) {
+				Key.Back -> {
+					if (event.type == KeyEventType.KeyUp) onInteraction()
+					false
+				}
+				else -> false
+			}
+		}
+	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
+
+	Row(
+		modifier = modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+		verticalAlignment = Alignment.Top,
+	) {
+		Text(
+			text = formatTime(entry.timeMs),
+			color = BiliPink,
+			fontSize = 13.sp,
+			modifier = Modifier.width(52.dp),
+		)
+		Column(modifier = Modifier.weight(1f)) {
+			Text(
+				text = entry.text,
+				color = if (focused) Color.White else Color(0xDDFFFFFF),
+				fontSize = 14.sp,
+				maxLines = 2,
+				overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+			)
+			val meta = buildString {
+				append(entry.typeLabel)
+				entry.sender?.let { append(" · ").append(it.take(10)) }
+				entry.sentDateLabel?.let { append(" · ").append(it) }
+			}
+			Text(text = meta, color = Color(0x88FFFFFF), fontSize = 11.sp)
+		}
+	}
+}
+
+@Composable
+private fun CentralPlayButton(
+	onClick: () -> Unit,
+	modifier: Modifier = Modifier,
+) {
+	var focused by remember { mutableStateOf(false) }
+	val focusRequester = remember { FocusRequester() }
+
+	Box(
+		modifier = modifier
+			.size(96.dp)
+			.background(Color(0x80FB7299), CircleShape)
+			.border(
+				width = if (focused) 4.dp else 2.dp,
+				color = if (focused) Color.White else BiliPink,
+				shape = CircleShape,
+			)
+			.onFocusChanged { focused = it.isFocused }
+			.focusRequester(focusRequester)
+			.autoFocus(focusRequester)
+			.focusable()
+			.onKeyEvent { event ->
+				if (event.type == KeyEventType.KeyUp &&
+					(event.key == Key.DirectionCenter || event.key == Key.Enter)
+				) {
+					onClick()
+					true
+				} else false
+			},
+		contentAlignment = Alignment.Center,
+	) {
+		Image(
+			painter = painterResource(R.drawable.ic_bili_play),
+			contentDescription = "play",
+			colorFilter = ColorFilter.tint(Color.White),
+			contentScale = ContentScale.Fit,
+			modifier = Modifier.size(44.dp),
+		)
 	}
 }
 

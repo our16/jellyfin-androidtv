@@ -106,6 +106,8 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	private var bufferedState by mutableLongStateOf(0L)
 	private var danmakuVisibleState by mutableStateOf(true)
 	private var danmakuLoadedState by mutableStateOf(false)
+	private var danmakuEntriesState by mutableStateOf<List<DanmakuListEntry>>(emptyList())
+	private var danmakuListVisible by mutableStateOf(false)
 	private var seekHintState by mutableStateOf<String?>(null)
 	private var hasNextState by mutableStateOf(false)
 	private var titleState by mutableStateOf("")
@@ -210,6 +212,8 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				bufferedMs = bufferedState,
 				danmakuVisible = danmakuVisibleState,
 				danmakuLoaded = danmakuLoadedState,
+				danmakuEntries = danmakuEntriesState,
+				danmakuListVisible = danmakuListVisible,
 				hasNext = hasNextState,
 				seekHint = seekHintState,
 				danmakuSettingsExpanded = danmakuSettingsVisible,
@@ -218,6 +222,7 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				opacityIdx = danmakuOpacityIdxState,
 				areaIdx = danmakuAreaIdxState,
 				onDanmakuSettingsExpandedChange = { danmakuSettingsVisible = it },
+				onDanmakuListVisibleChange = { danmakuListVisible = it },
 				onCycleDanmakuSetting = ::cycleDanmakuSetting,
 				onInteraction = ::scheduleHideControls,
 				onDismiss = { hideControls() },
@@ -387,6 +392,8 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 		playbackRetryCount = 0
 		danmakuLoadedState = false
 		danmakuVisibleState = true
+		danmakuEntriesState = emptyList()
+		danmakuListVisible = false
 		hasNextState = index < queue.size - 1
 		reportStopInternal()
 
@@ -520,8 +527,8 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	private fun scheduleHideControls() {
 		if (hideControlsRunnable == null) {
 			hideControlsRunnable = Runnable {
-				// Never auto-hide while the danmaku settings popup is open
-				if (danmakuSettingsVisible) {
+				// Never auto-hide while the danmaku settings popup or list panel is open
+				if (danmakuSettingsVisible || danmakuListVisible) {
 					scheduleHideControls()
 					return@Runnable
 				}
@@ -704,6 +711,10 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 			}
 
 			try {
+				// Parse the raw XML for the danmaku list side panel (safe metadata
+				// parse, independent of the danmaku engine's own parse)
+				danmakuEntriesState = parseDanmakuList(xml)
+
 				val manager = DanmakuManager(requireActivity())
 				manager.initialize(view)
 				// Bypass CacheManagingDrawTask (its build-cache thread previously crashed
