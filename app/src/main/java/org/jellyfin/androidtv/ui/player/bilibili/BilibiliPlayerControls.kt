@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,6 +75,14 @@ fun BilibiliPlayerControls(
 	danmakuLoaded: Boolean,
 	hasNext: Boolean,
 	seekHint: String?,
+	danmakuSettingsExpanded: Boolean,
+	textSizeIdx: Int,
+	speedIdx: Int,
+	opacityIdx: Int,
+	areaIdx: Int,
+	onDanmakuSettingsExpandedChange: (Boolean) -> Unit,
+	onCycleDanmakuSetting: (Int) -> Unit,
+	onInteraction: () -> Unit,
 	onDismiss: () -> Unit,
 	onTogglePlay: () -> Unit,
 	onSeekTo: (Long) -> Unit,
@@ -80,7 +90,6 @@ fun BilibiliPlayerControls(
 	onStepForward: () -> Unit,
 	onPlayNext: () -> Unit,
 	onToggleDanmaku: () -> Unit,
-	onOpenDanmakuSettings: () -> Unit,
 ) {
 	Box(modifier = Modifier.fillMaxSize()) {
 		if (visible && isBuffering) {
@@ -134,13 +143,20 @@ fun BilibiliPlayerControls(
 				danmakuVisible = danmakuVisible,
 				danmakuLoaded = danmakuLoaded,
 				hasNext = hasNext,
+				danmakuSettingsExpanded = danmakuSettingsExpanded,
+				textSizeIdx = textSizeIdx,
+				speedIdx = speedIdx,
+				opacityIdx = opacityIdx,
+				areaIdx = areaIdx,
+				onDanmakuSettingsExpandedChange = onDanmakuSettingsExpandedChange,
+				onCycleDanmakuSetting = onCycleDanmakuSetting,
+				onInteraction = onInteraction,
 				onTogglePlay = onTogglePlay,
 				onSeekTo = onSeekTo,
 				onStepBack = onStepBack,
 				onStepForward = onStepForward,
 				onPlayNext = onPlayNext,
 				onToggleDanmaku = onToggleDanmaku,
-				onOpenDanmakuSettings = onOpenDanmakuSettings,
 			)
 		}
 	}
@@ -156,102 +172,6 @@ val danmakuAreas = floatArrayOf(0.35f, 0.5f, 0.75f, 1.0f)
 val danmakuAreaLabels = arrayOf("1/3屏", "半屏", "3/4屏", "全屏")
 
 @Composable
-fun BilibiliDanmakuSettingsPanel(
-	visible: Boolean,
-	textSizeIdx: Int,
-	speedIdx: Int,
-	opacityIdx: Int,
-	areaIdx: Int,
-	onCycle: (Int) -> Unit,
-	onDismiss: () -> Unit,
-) {
-	val focusRequester = remember { FocusRequester() }
-	LaunchedEffect(visible) {
-		if (visible) focusRequester.requestFocus()
-	}
-
-	AnimatedVisibility(
-		visible = visible,
-		enter = fadeIn(),
-		exit = fadeOut(),
-	) {
-		Column(
-			modifier = Modifier
-				.fillMaxWidth()
-				.background(Color(0xE6222222), RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-				.padding(horizontal = 40.dp, vertical = 20.dp),
-		) {
-			Text(
-				text = "弹幕设置",
-				color = BiliPink,
-				fontSize = 18.sp,
-				modifier = Modifier.padding(bottom = 12.dp),
-			)
-			SettingRow(
-				focusRequester = focusRequester,
-				label = "字体大小",
-				value = danmakuTextSizeLabels[textSizeIdx.coerceIn(0, danmakuTextSizeLabels.lastIndex)],
-			) { onCycle(0) }
-			SettingRow(
-				label = "速度",
-				value = danmakuSpeedLabels[speedIdx.coerceIn(0, danmakuSpeedLabels.lastIndex)],
-			) { onCycle(1) }
-			SettingRow(
-				label = "显示区域",
-				value = danmakuAreaLabels[areaIdx.coerceIn(0, danmakuAreaLabels.lastIndex)],
-			) { onCycle(2) }
-			SettingRow(
-				label = "不透明度",
-				value = "${danmakuOpacities[opacityIdx.coerceIn(0, danmakuOpacities.lastIndex)]}%",
-			) { onCycle(3) }
-			Spacer(modifier = Modifier.height(6.dp))
-			Text(
-				text = "按 OK 切换档位，返回键关闭",
-				color = Color(0x88FFFFFF),
-				fontSize = 13.sp,
-			)
-		}
-	}
-}
-
-@Composable
-private fun SettingRow(
-	focusRequester: FocusRequester? = null,
-	label: String,
-	value: String,
-	onCycle: () -> Unit,
-) {
-	var focused by remember { mutableStateOf(false) }
-	var modifier = Modifier
-		.fillMaxWidth()
-		.padding(vertical = 3.dp)
-		.background(
-			if (focused) Color(0x33FFFFFF) else Color.Transparent,
-			RoundedCornerShape(8.dp)
-		)
-		.then(
-			if (focused) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier
-		)
-		.onFocusChanged { focused = it.isFocused }
-		.focusable()
-		.onKeyEvent { event ->
-			if (event.key == Key.DirectionCenter || event.key == Key.Enter) {
-				onCycle()
-				true
-			} else false
-		}
-	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
-	Row(
-		modifier = modifier,
-		verticalAlignment = Alignment.CenterVertically,
-	) {
-		Text(text = label, color = Color.White, fontSize = 17.sp)
-		Spacer(modifier = Modifier.weight(1f))
-		Text(text = value, color = BiliPink, fontSize = 17.sp)
-	}
-}
-
-@Composable
 private fun BottomBar(
 	isPlaying: Boolean,
 	positionMs: Long,
@@ -260,13 +180,20 @@ private fun BottomBar(
 	danmakuVisible: Boolean,
 	danmakuLoaded: Boolean,
 	hasNext: Boolean,
+	danmakuSettingsExpanded: Boolean,
+	textSizeIdx: Int,
+	speedIdx: Int,
+	opacityIdx: Int,
+	areaIdx: Int,
+	onDanmakuSettingsExpandedChange: (Boolean) -> Unit,
+	onCycleDanmakuSetting: (Int) -> Unit,
+	onInteraction: () -> Unit,
 	onTogglePlay: () -> Unit,
 	onSeekTo: (Long) -> Unit,
 	onStepBack: () -> Unit,
 	onStepForward: () -> Unit,
 	onPlayNext: () -> Unit,
 	onToggleDanmaku: () -> Unit,
-	onOpenDanmakuSettings: () -> Unit,
 ) {
 	val focusRequester = remember { FocusRequester() }
 	var previewMs by remember { mutableLongStateOf(-1L) }
@@ -303,6 +230,7 @@ private fun BottomBar(
 							if (durationMs > 0) {
 								previewMs = ((if (previewMs < 0) positionMs else previewMs) - 10_000L)
 									.coerceIn(0L, durationMs)
+								onInteraction()
 							}
 							true
 						}
@@ -310,6 +238,7 @@ private fun BottomBar(
 							if (durationMs > 0) {
 								previewMs = ((if (previewMs < 0) positionMs else previewMs) + 10_000L)
 									.coerceIn(0L, durationMs)
+								onInteraction()
 							}
 							true
 						}
@@ -317,6 +246,7 @@ private fun BottomBar(
 							if (previewMs >= 0) {
 								onSeekTo(previewMs)
 								previewMs = -1
+								onInteraction()
 							}
 							true
 						}
@@ -397,15 +327,31 @@ private fun BottomBar(
 			ControlButton(
 				icon = painterResource(if (danmakuVisible) R.drawable.ic_danmaku_on else R.drawable.ic_danmaku_off),
 				contentDescription = "danmaku",
-				tint = if (danmakuLoaded && danmakuVisible) BiliPink else Color.White,
+				tint = if (danmakuLoaded && danmakuVisible) BiliPink else Color(0x61FFFFFF),
 				onClick = onToggleDanmaku,
 			)
-			ControlButton(
-				icon = painterResource(R.drawable.ic_bili_danmaku_settings),
-				contentDescription = "danmaku settings",
-				tint = Color.White,
-				onClick = onOpenDanmakuSettings,
-			)
+			Box {
+				ControlButton(
+					icon = painterResource(R.drawable.ic_bili_danmaku_settings),
+					contentDescription = "danmaku settings",
+					tint = if (danmakuSettingsExpanded) BiliPink else Color.White,
+					onClick = { onDanmakuSettingsExpandedChange(true) },
+				)
+				if (danmakuSettingsExpanded) {
+					// Custom anchored popup: plain Compose focusable rows so the TV remote's
+					// D-pad moves between options (DropdownMenu only supports Tab navigation)
+					DanmakuSettingsPopup(
+						textSizeIdx = textSizeIdx,
+						speedIdx = speedIdx,
+						opacityIdx = opacityIdx,
+						areaIdx = areaIdx,
+						onCycle = onCycleDanmakuSetting,
+						onInteraction = onInteraction,
+						onDismiss = { onDanmakuSettingsExpandedChange(false) },
+						modifier = Modifier.align(Alignment.BottomEnd),
+					)
+				}
+			}
 			if (hasNext) {
 				ControlButton(
 					icon = painterResource(R.drawable.ic_bili_next),
@@ -414,6 +360,107 @@ private fun BottomBar(
 				)
 			}
 		}
+	}
+}
+
+@Composable
+private fun DanmakuSettingsPopup(
+	textSizeIdx: Int,
+	speedIdx: Int,
+	opacityIdx: Int,
+	areaIdx: Int,
+	onCycle: (Int) -> Unit,
+	onInteraction: () -> Unit,
+	onDismiss: () -> Unit,
+	modifier: Modifier = Modifier,
+) {
+	val focusRequester = remember { FocusRequester() }
+	LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+	Column(
+		modifier = modifier
+			.offset(x = 0.dp, y = -212.dp)
+			.width(230.dp)
+			.background(Color(0xF0222222), RoundedCornerShape(10.dp))
+			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+			.focusGroup()
+			.padding(vertical = 6.dp),
+	) {
+		SettingRow(
+			focusRequester = focusRequester,
+			label = "字体大小",
+			value = danmakuTextSizeLabels[textSizeIdx.coerceIn(0, danmakuTextSizeLabels.lastIndex)],
+			onCycle = { onCycle(0); onInteraction() },
+			onDismiss = onDismiss,
+		)
+		SettingRow(
+			label = "速度",
+			value = danmakuSpeedLabels[speedIdx.coerceIn(0, danmakuSpeedLabels.lastIndex)],
+			onCycle = { onCycle(1); onInteraction() },
+			onDismiss = onDismiss,
+		)
+		SettingRow(
+			label = "显示区域",
+			value = danmakuAreaLabels[areaIdx.coerceIn(0, danmakuAreaLabels.lastIndex)],
+			onCycle = { onCycle(2); onInteraction() },
+			onDismiss = onDismiss,
+		)
+		SettingRow(
+			label = "不透明度",
+			value = "${danmakuOpacities[opacityIdx.coerceIn(0, danmakuOpacities.lastIndex)]}%",
+			onCycle = { onCycle(3); onInteraction() },
+			onDismiss = onDismiss,
+		)
+	}
+}
+
+@Composable
+private fun SettingRow(
+	focusRequester: FocusRequester? = null,
+	label: String,
+	value: String,
+	onCycle: () -> Unit,
+	onDismiss: () -> Unit,
+) {
+	var focused by remember { mutableStateOf(false) }
+	var modifier = Modifier
+		.fillMaxWidth()
+		.padding(horizontal = 8.dp, vertical = 2.dp)
+		.background(
+			if (focused) Color(0x33FFFFFF) else Color.Transparent,
+			RoundedCornerShape(8.dp)
+		)
+		.then(
+			if (focused) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier
+		)
+		.onFocusChanged { focused = it.isFocused }
+		.focusable()
+		.onKeyEvent { event ->
+			when (event.key) {
+				Key.DirectionCenter, Key.Enter -> {
+					onCycle()
+					true
+				}
+				Key.DirectionLeft, Key.DirectionRight -> {
+					// don't steal horizontal navigation while the popup is open
+					true
+				}
+				Key.DirectionUp, Key.DirectionDown -> false
+				Key.Back -> {
+					onDismiss()
+					true
+				}
+				else -> false
+			}
+		}
+	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
+	Row(
+		modifier = modifier.height(40.dp),
+		verticalAlignment = Alignment.CenterVertically,
+	) {
+		Text(text = label, color = Color.White, fontSize = 15.sp)
+		Spacer(modifier = Modifier.weight(1f))
+		Text(text = value, color = BiliPink, fontSize = 15.sp)
 	}
 }
 

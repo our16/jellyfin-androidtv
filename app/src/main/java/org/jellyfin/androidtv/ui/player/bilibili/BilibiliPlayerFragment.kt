@@ -132,14 +132,6 @@ class BilibiliPlayerFragment : Fragment() {
 		danmakuManager?.applySettings(sizeSpeed.first, sizeSpeed.second, sizeSpeed.third, area)
 	}
 
-	private fun openDanmakuSettings() {
-		danmakuTextSizeIdxState = userPreferences[UserPreferences.danmakuTextSizeIdx]
-		danmakuSpeedIdxState = userPreferences[UserPreferences.danmakuSpeedIdx]
-		danmakuOpacityIdxState = userPreferences[UserPreferences.danmakuOpacityIdx]
-		danmakuAreaIdxState = userPreferences[UserPreferences.danmakuAreaIdx]
-		danmakuSettingsVisible = true
-	}
-
 	/** cycling one preset forward for the given setting group (0 size, 1 speed, 2 area, 3 opacity) */
 	private fun cycleDanmakuSetting(which: Int) {
 		fun Int.cycled(size: Int) = (this + 1) % size
@@ -162,6 +154,8 @@ class BilibiliPlayerFragment : Fragment() {
 			}
 		}
 		applyDanmakuSettings()
+		// user is actively interacting: keep the controls visible
+		scheduleHideControls()
 	}
 
 	// Playback failure fallback: direct play -> direct stream -> forced transcode
@@ -218,6 +212,14 @@ class BilibiliPlayerFragment : Fragment() {
 				danmakuLoaded = danmakuLoadedState,
 				hasNext = hasNextState,
 				seekHint = seekHintState,
+				danmakuSettingsExpanded = danmakuSettingsVisible,
+				textSizeIdx = danmakuTextSizeIdxState,
+				speedIdx = danmakuSpeedIdxState,
+				opacityIdx = danmakuOpacityIdxState,
+				areaIdx = danmakuAreaIdxState,
+				onDanmakuSettingsExpandedChange = { danmakuSettingsVisible = it },
+				onCycleDanmakuSetting = ::cycleDanmakuSetting,
+				onInteraction = ::scheduleHideControls,
 				onDismiss = { hideControls() },
 				onTogglePlay = ::togglePlayPause,
 				onSeekTo = ::seekTo,
@@ -225,17 +227,6 @@ class BilibiliPlayerFragment : Fragment() {
 				onStepForward = { seekBy(userSettingPreferences[UserSettingPreferences.skipForwardLength].toLong()) },
 				onPlayNext = ::playNext,
 				onToggleDanmaku = ::toggleDanmaku,
-				onOpenDanmakuSettings = ::openDanmakuSettings,
-			)
-
-			BilibiliDanmakuSettingsPanel(
-				visible = danmakuSettingsVisible,
-				textSizeIdx = danmakuTextSizeIdxState,
-				speedIdx = danmakuSpeedIdxState,
-				opacityIdx = danmakuOpacityIdxState,
-				areaIdx = danmakuAreaIdxState,
-				onCycle = ::cycleDanmakuSetting,
-				onDismiss = { danmakuSettingsVisible = false },
 			)
 		}
 	}
@@ -514,7 +505,14 @@ class BilibiliPlayerFragment : Fragment() {
 
 	private fun scheduleHideControls() {
 		if (hideControlsRunnable == null) {
-			hideControlsRunnable = Runnable { controlsVisible = false }
+			hideControlsRunnable = Runnable {
+				// Never auto-hide while the danmaku settings popup is open
+				if (danmakuSettingsVisible) {
+					scheduleHideControls()
+					return@Runnable
+				}
+				controlsVisible = false
+			}
 		}
 		handler.removeCallbacks(hideControlsRunnable!!)
 		handler.postDelayed(hideControlsRunnable!!, AUTO_HIDE_CONTROLS_MS)
@@ -729,8 +727,9 @@ class BilibiliPlayerFragment : Fragment() {
 			return
 		}
 		danmakuVisibleState = !danmakuVisibleState
+		// setVisible toggles show/hide on the engine; a follow-up start() would clear the
+		// pending SHOW message (removeCallbacksAndMessages) and danmaku would stay hidden
 		danmakuManager?.setVisible(danmakuVisibleState)
-		if (danmakuVisibleState) danmakuManager?.start(player?.currentPosition ?: 0)
 		scheduleHideControls()
 	}
 

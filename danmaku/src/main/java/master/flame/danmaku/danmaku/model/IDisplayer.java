@@ -29,6 +29,12 @@ public interface IDisplayer {
 
     int getHeight();
 
+    /**
+     * The vertical range available for danmaku layout, counted from getAllMarginTop().
+     * Returns getHeight() by default (full screen).
+     */
+    int getVisibleHeight();
+
     float getDensity();
 
     int getDensityDpi();

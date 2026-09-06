@@ -357,6 +357,8 @@ public class AndroidDisplayer extends AbsDisplayer<Canvas, Typeface> {
 
     private int height;
 
+    private int visibleHeight = 0;
+
     private float locationZ;
 
     private float density = 1;
@@ -575,6 +577,15 @@ public class AndroidDisplayer extends AbsDisplayer<Canvas, Typeface> {
         this.width = width;
         this.height = height;
         this.locationZ = (float) (width / 2f / Math.tan((Math.PI / 180) * (55f / 2f)));
+    }
+
+    public void setVisibleHeight(int h) {
+        this.visibleHeight = h;
+    }
+
+    @Override
+    public int getVisibleHeight() {
+        return visibleHeight > 0 ? visibleHeight : height;
     }
 
     @Override

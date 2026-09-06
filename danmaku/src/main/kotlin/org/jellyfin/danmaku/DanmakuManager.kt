@@ -168,7 +168,7 @@ class DanmakuManager(private val activity: Activity) {
      * @param textSize  scaleTextSize factor (1.0 = original XML size)
      * @param speed     scrollSpeedFactor (larger = slower)
      * @param opacity   0..1 (1 = fully opaque)
-     * @param area      0..1 fraction of screen height usable by danmaku
+     * @param area      0..1 fraction of screen height usable by danmaku (from the top)
      */
     fun applySettings(textSize: Float, speed: Float, opacity: Float, area: Float) {
         val ctx = danmakuContext ?: return
@@ -176,8 +176,14 @@ class DanmakuManager(private val activity: Activity) {
             ctx.setScaleTextSize(textSize)
             ctx.setScrollSpeedFactor(speed)
             ctx.setDanmakuTransparency(opacity)
-            val h = ctx.mDisplayer.height
-            if (h > 0) ctx.setDanmakuMargin((h * (1f - area)).toInt())
+            val disp = ctx.mDisplayer as? master.flame.danmaku.danmaku.model.android.AndroidDisplayer
+            if (disp != null) {
+                val h = disp.height
+                if (h > 0) disp.setVisibleHeight((h * area.coerceIn(0.1f, 1f)).toInt())
+            }
+            // Danmaku fills from the top down (Bilibili style), so keep top offset at 0
+            ctx.setMarginTop(0)
+            ctx.mGlobalFlagValues.updateVisibleFlag()
         }
         Timber.d("Danmaku settings applied: size=%s speed=%s opacity=%s area=%s", textSize, speed, opacity, area)
     }

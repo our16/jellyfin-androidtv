@@ -145,7 +145,7 @@ public class DanmakusRetainer {
                 if (firstItem == null)
                     firstItem = item;
 
-                if (drawItem.paintHeight + item.getTop() > disp.getHeight()) {
+                if (drawItem.paintHeight + item.getTop() > disp.getAllMarginTop() + disp.getVisibleHeight()) {
                     overwriteInsert = true;
                     return ACTION_BREAK;
                 }
@@ -278,7 +278,7 @@ public class DanmakusRetainer {
 
         protected boolean isOutVerticalEdge(boolean overwriteInsert, BaseDanmaku drawItem,
                                             IDisplayer disp, float topPos, BaseDanmaku firstItem, BaseDanmaku lastItem) {
-            if (topPos < disp.getAllMarginTop() || (firstItem != null && firstItem.getTop() > 0) || topPos + drawItem.paintHeight > disp.getHeight()) {
+            if (topPos < disp.getAllMarginTop() || (firstItem != null && firstItem.getTop() > 0) || topPos + drawItem.paintHeight > disp.getAllMarginTop() + disp.getVisibleHeight()) {
                 return true;
             }
             return false;

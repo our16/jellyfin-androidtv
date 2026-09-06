@@ -13,6 +13,11 @@ public abstract class AbsDisplayer<T, F> implements IDisplayer {
         return false;
     }
 
+    @Override
+    public int getVisibleHeight() {
+        return getHeight();
+    }
+
     public abstract void drawDanmaku(BaseDanmaku danmaku, T canvas, float left, float top, boolean fromWorkerThread);
 
     public abstract void clearTextHeightCache();
