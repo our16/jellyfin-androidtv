@@ -404,24 +404,23 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     }
 
     private void setDefaultGridRowCols(PosterSize posterSize, ImageType imageType) {
-        // HINT: use uneven Rows/Cols if possible, so selected middle lines up with TV middle!
         if (mGridPresenter instanceof VerticalGridPresenter) {
             int numCols;
             switch (posterSize) {
                 case SMALLEST:
-                    numCols = imageType.equals(ImageType.BANNER) ? 6 : imageType.equals(ImageType.THUMB) ? 11 : 15;
+                    numCols = imageType.equals(ImageType.BANNER) ? 6 : imageType.equals(ImageType.THUMB) ? 4 : 15;
                     break;
                 case SMALL:
-                    numCols = imageType.equals(ImageType.BANNER) ? 5 : imageType.equals(ImageType.THUMB) ? 9 : 13;
+                    numCols = imageType.equals(ImageType.BANNER) ? 5 : imageType.equals(ImageType.THUMB) ? 4 : 13;
                     break;
                 case MED:
-                    numCols = imageType.equals(ImageType.BANNER) ? 4 : imageType.equals(ImageType.THUMB) ? 7 : 11;
+                    numCols = imageType.equals(ImageType.BANNER) ? 4 : imageType.equals(ImageType.THUMB) ? 4 : 11;
                     break;
                 case LARGE:
-                    numCols = imageType.equals(ImageType.BANNER) ? 3 : imageType.equals(ImageType.THUMB) ? 5 : 7;
+                    numCols = imageType.equals(ImageType.BANNER) ? 3 : imageType.equals(ImageType.THUMB) ? 4 : 7;
                     break;
                 case X_LARGE:
-                    numCols = imageType.equals(ImageType.BANNER) ? 2 : imageType.equals(ImageType.THUMB) ? 3 : 5;
+                    numCols = imageType.equals(ImageType.BANNER) ? 2 : imageType.equals(ImageType.THUMB) ? 4 : 5;
                     break;
                 default:
                     throw new IllegalStateException("Unexpected value: " + mPosterSizeSetting);
