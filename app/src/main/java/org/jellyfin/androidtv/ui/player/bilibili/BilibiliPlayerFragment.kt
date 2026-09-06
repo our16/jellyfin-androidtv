@@ -365,6 +365,7 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	private fun setupBackHandling() {
 		requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
 			when {
+				danmakuListVisible -> danmakuListVisible = false
 				danmakuSettingsVisible -> danmakuSettingsVisible = false
 				controlsVisible -> hideControls()
 				else -> exitPlayback()

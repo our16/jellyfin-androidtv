@@ -153,8 +153,9 @@ fun BilibiliPlayerControls(
 		}
 
 		// Central play button while paused: gives focus a clear target so the
-		// progress bar does not swallow OK presses while paused
-		if (visible && !isPlaying && !isBuffering && !danmakuSettingsExpanded && !danmakuListVisible) {
+		// progress bar does not swallow OK presses while paused. Shown even when
+		// the other controls auto-hid so focus stays anchored on it.
+		if (!isPlaying && !isBuffering && !danmakuSettingsExpanded && !danmakuListVisible) {
 			CentralPlayButton(
 				onClick = onTogglePlay,
 				modifier = Modifier.align(Alignment.Center),
@@ -255,12 +256,8 @@ private fun BottomBar(
 		}
 	}
 
-	LaunchedEffect(Unit) {
-		focusRequester.requestFocus()
-	}
-
-	// When playback resumes the central play button disappears - pull focus back
-	// to the progress bar so remote navigation keeps working
+	// Only claim focus while playing: when paused the central play button is the
+	// focus anchor and must keep it until playback resumes
 	LaunchedEffect(isPlaying) {
 		if (isPlaying) focusRequester.requestFocus()
 	}
@@ -522,7 +519,6 @@ private fun DanmakuListPanel(
 	modifier: Modifier = Modifier,
 ) {
 	val focusRequester = remember { FocusRequester() }
-	LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
 	Column(
 		modifier = modifier
@@ -556,6 +552,7 @@ private fun DanmakuListPanel(
 				itemsIndexed(entries, key = { _, e -> "${e.timeMs}-${e.text.hashCode()}" }) { _, entry ->
 					DanmakuListRow(
 						entry = entry,
+						onBack = onClose,
 						onInteraction = onInteraction,
 						focusRequester = if (entry === entries.firstOrNull()) focusRequester else null,
 					)
@@ -568,6 +565,7 @@ private fun DanmakuListPanel(
 @Composable
 private fun DanmakuListRow(
 	entry: DanmakuListEntry,
+	onBack: () -> Unit,
 	onInteraction: () -> Unit,
 	focusRequester: FocusRequester?,
 ) {
@@ -582,13 +580,13 @@ private fun DanmakuListRow(
 		.onKeyEvent { event ->
 			when (event.key) {
 				Key.Back -> {
-					if (event.type == KeyEventType.KeyUp) onInteraction()
-					false
+					if (event.type == KeyEventType.KeyUp) onBack()
+					true
 				}
 				else -> false
 			}
 		}
-	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester)
+	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester).autoFocus(focusRequester)
 
 	Row(
 		modifier = modifier.padding(horizontal = 8.dp, vertical = 6.dp),
