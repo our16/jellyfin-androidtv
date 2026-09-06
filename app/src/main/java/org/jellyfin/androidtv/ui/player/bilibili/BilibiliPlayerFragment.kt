@@ -322,7 +322,9 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 		if (event == null) return false
 		val isDown = event.action == KeyEvent.ACTION_DOWN
 		val isUp = event.action == KeyEvent.ACTION_UP
-		if (controlsVisible || danmakuSettingsVisible) return false
+		// While the danmaku list panel is open, focus is trapped inside it (focusProperties)
+		// and every key is handled by Compose; Back closes the panel
+		if (controlsVisible || danmakuSettingsVisible || danmakuListVisible) return false
 		return when (keyCode) {
 			KeyEvent.KEYCODE_DPAD_LEFT,
 			KeyEvent.KEYCODE_MEDIA_REWIND,

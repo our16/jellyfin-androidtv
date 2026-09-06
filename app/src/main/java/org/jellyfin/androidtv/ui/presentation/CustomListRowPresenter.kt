@@ -20,6 +20,12 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 	override fun onBindRowViewHolder(holder: RowPresenter.ViewHolder, item: Any) {
 		super.onBindRowViewHolder(holder, item)
 
+		// Wider gap between cards inside a row: card titles are always shown now
+		// and would be cramped/cut off with the leanback default spacing
+		if (holder is ListRowPresenter.ViewHolder) {
+			holder.gridView.setItemSpacing((16 * holder.view.resources.displayMetrics.density).toInt())
+		}
+
 		val view = holder.view?.parent as? View ?: return
 		if (topPadding != null) view.setPadding(view.paddingLeft, topPadding, view.paddingRight, view.paddingBottom)
 

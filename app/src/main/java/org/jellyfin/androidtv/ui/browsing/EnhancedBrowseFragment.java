@@ -148,6 +148,15 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // Vertical spacing between rows: card titles are always shown now, rows
+        // would visually merge without extra breathing room
+        view.post(() -> {
+            androidx.leanback.widget.VerticalGridView rowsGrid = mRowsFragment.getVerticalGridView();
+            if (rowsGrid != null) {
+                rowsGrid.setItemSpacing((int) (16 * getResources().getDisplayMetrics().density));
+            }
+        });
+
         setupEventListeners();
     }
 

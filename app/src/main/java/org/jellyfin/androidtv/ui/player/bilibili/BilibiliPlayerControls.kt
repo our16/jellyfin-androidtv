@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -125,11 +126,14 @@ fun BilibiliPlayerControls(
 		// a menu nested in the gear button's Box would inflate the Box and shift neighbouring buttons
 		if (danmakuSettingsExpanded) {
 			DanmakuSettingsPopup(
+				danmakuVisible = danmakuVisible,
+				danmakuLoaded = danmakuLoaded,
 				textSizeIdx = textSizeIdx,
 				speedIdx = speedIdx,
 				opacityIdx = opacityIdx,
 				areaIdx = areaIdx,
 				onCycle = onCycleDanmakuSetting,
+				onToggleDanmaku = onToggleDanmaku,
 				onOpenList = {
 					onDanmakuSettingsExpandedChange(false)
 					onDanmakuListVisibleChange(true)
@@ -190,8 +194,6 @@ fun BilibiliPlayerControls(
 				positionMs = positionMs,
 				durationMs = durationMs,
 				bufferedMs = bufferedMs,
-				danmakuVisible = danmakuVisible,
-				danmakuLoaded = danmakuLoaded,
 				hasNext = hasNext,
 				danmakuSettingsExpanded = danmakuSettingsExpanded,
 				textSizeIdx = textSizeIdx,
@@ -206,7 +208,6 @@ fun BilibiliPlayerControls(
 				onStepBack = onStepBack,
 				onStepForward = onStepForward,
 				onPlayNext = onPlayNext,
-				onToggleDanmaku = onToggleDanmaku,
 			)
 		}
 	}
@@ -227,8 +228,6 @@ private fun BottomBar(
 	positionMs: Long,
 	durationMs: Long,
 	bufferedMs: Long,
-	danmakuVisible: Boolean,
-	danmakuLoaded: Boolean,
 	hasNext: Boolean,
 	danmakuSettingsExpanded: Boolean,
 	textSizeIdx: Int,
@@ -243,7 +242,6 @@ private fun BottomBar(
 	onStepBack: () -> Unit,
 	onStepForward: () -> Unit,
 	onPlayNext: () -> Unit,
-	onToggleDanmaku: () -> Unit,
 ) {
 	val focusRequester = remember { FocusRequester() }
 	var previewMs by remember { mutableLongStateOf(-1L) }
@@ -379,12 +377,6 @@ private fun BottomBar(
 			Spacer(modifier = Modifier.weight(1f))
 
 			ControlButton(
-				icon = painterResource(if (danmakuVisible) R.drawable.ic_danmaku_on else R.drawable.ic_danmaku_off),
-				contentDescription = "danmaku",
-				tint = if (danmakuLoaded && danmakuVisible) BiliPink else Color(0x61FFFFFF),
-				onClick = onToggleDanmaku,
-			)
-			ControlButton(
 				icon = painterResource(R.drawable.ic_bili_danmaku_settings),
 				contentDescription = "danmaku settings",
 				tint = if (danmakuSettingsExpanded) BiliPink else Color.White,
@@ -403,11 +395,14 @@ private fun BottomBar(
 
 @Composable
 private fun DanmakuSettingsPopup(
+	danmakuVisible: Boolean,
+	danmakuLoaded: Boolean,
 	textSizeIdx: Int,
 	speedIdx: Int,
 	opacityIdx: Int,
 	areaIdx: Int,
 	onCycle: (Int) -> Unit,
+	onToggleDanmaku: () -> Unit,
 	onOpenList: () -> Unit,
 	onInteraction: () -> Unit,
 	onDismiss: () -> Unit,
@@ -425,8 +420,15 @@ private fun DanmakuSettingsPopup(
 			.focusGroup()
 			.padding(vertical = 6.dp),
 	) {
+		// Danmaku on/off toggle (moved here from the bottom bar)
 		SettingRow(
 			focusRequester = focusRequester,
+			label = "弹幕开关",
+			value = if (danmakuVisible && danmakuLoaded) "开" else "关",
+			onCycle = { onToggleDanmaku(); onInteraction() },
+			onDismiss = onDismiss,
+		)
+		SettingRow(
 			label = "字体大小",
 			value = danmakuTextSizeLabels[textSizeIdx.coerceIn(0, danmakuTextSizeLabels.lastIndex)],
 			onCycle = { onCycle(0); onInteraction() },
@@ -511,6 +513,7 @@ private fun SettingRow(
 	}
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun DanmakuListPanel(
 	entries: List<DanmakuListEntry>,
@@ -520,6 +523,17 @@ private fun DanmakuListPanel(
 ) {
 	val focusRequester = remember { FocusRequester() }
 
+	// Pull focus into the list: the first row's focusRequester may race with the
+	// central play button disappearing or the bottom bar taking focus, so retry
+	// for a short while until the list really owns focus
+	LaunchedEffect(entries.isNotEmpty()) {
+		if (entries.isEmpty()) return@LaunchedEffect
+		repeat(25) {
+			runCatching { focusRequester.requestFocus() }
+			delay(100)
+		}
+	}
+
 	Column(
 		modifier = modifier
 			.width(430.dp)
@@ -527,6 +541,10 @@ private fun DanmakuListPanel(
 			.background(Color(0xE6111111), RoundedCornerShape(12.dp))
 			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
 			.focusGroup()
+			// Focus is trapped inside the panel until Back closes it: any attempt
+			// to move focus outside (left/right to controls, up/down past the ends)
+			// is cancelled, so the remote cannot wander out of the list
+			.focusProperties { exit = { FocusRequester.Cancel } }
 			.padding(10.dp),
 	) {
 		Row(

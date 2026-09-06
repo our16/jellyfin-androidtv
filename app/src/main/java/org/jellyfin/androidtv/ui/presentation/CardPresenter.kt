@@ -499,6 +499,7 @@ private fun CardViewHolderContent(
 		) else Modifier
 
 		ItemPreview(
+			spacing = 6.dp,
 			card = { card() },
 			title = title?.let { text ->
 				{

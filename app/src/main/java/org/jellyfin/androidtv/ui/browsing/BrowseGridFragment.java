@@ -219,6 +219,9 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     }
 
     private void createGrid() {
+        mGridItemSpacingHorizontal = (int) (16 * getResources().getDisplayMetrics().density);
+        mGridItemSpacingVertical = mGridItemSpacingHorizontal;
+
         mGridViewHolder = mGridPresenter.onCreateViewHolder(binding.rowsFragment);
         if (mGridViewHolder instanceof HorizontalGridPresenter.ViewHolder) {
             mGridView = ((HorizontalGridPresenter.ViewHolder) mGridViewHolder).getGridView();

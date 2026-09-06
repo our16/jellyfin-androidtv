@@ -91,8 +91,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter())
 
-		lifecycleScope.launch(Dispatchers.IO) {
-			val currentUser = withTimeout(30.seconds) {
+		lifecycleScope.launch(Dispatchers.IO) {			val currentUser = withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}
 
@@ -129,6 +128,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
 				val cardPresenter = CardPresenter()
+
+				// Vertical spacing between home rows (titles are always shown on cards now)
+				view?.post {
+					verticalGridView?.setItemSpacing((16 * resources.displayMetrics.density).toInt())
+				}
 
 				// Add rows in order
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
