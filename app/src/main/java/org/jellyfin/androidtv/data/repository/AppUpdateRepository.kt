@@ -149,19 +149,57 @@ class AppUpdateRepositoryImpl(
 
 	/**
 	 * Parses the changelog dictionary from the Check response, e.g.
-	 * "changelog":{"zh-CN":"...","en-US":"..."}. Unescapes \n for display.
+	 * "changelog":{"zh-CN":"...","en-US":"..."}.
+	 * Values are JSON-escaped (\uXXXX for CJK, \n, \") and must be unescaped for display.
 	 */
 	private fun extractChangelog(json: String): Map<String, String> {
 		val match = Regex("\"[Cc]hangelog\"\\s*:\\s*\\{([^{}]*)\\}").find(json) ?: return emptyMap()
 		val result = mutableMapOf<String, String>()
 		Regex("\"([^\"]+)\"\\s*:\\s*\"([^\"]*)\"").findAll(match.groupValues[1]).forEach {
-			result[it.groupValues[1]] = it.groupValues[2].replace("\\n", "\n").replace("\\\"", "\"")
+			result[it.groupValues[1]] = unescapeJson(it.groupValues[2])
 		}
 		return result
 	}
 
+	/** Decodes JSON string escapes: \uXXXX, \n, \r, \t, \", \\, \/ */
+	private fun unescapeJson(s: String): String {
+		if ('\\' !in s) return s
+		val sb = StringBuilder(s.length)
+		var i = 0
+		while (i < s.length) {
+			val c = s[i]
+			if (c == '\\' && i + 1 < s.length) {
+				when (val n = s[i + 1]) {
+					'n' -> { sb.append('\n'); i += 2 }
+					't' -> { sb.append('\t'); i += 2 }
+					'r' -> { sb.append('\r'); i += 2 }
+					'"' -> { sb.append('"'); i += 2 }
+					'\\' -> { sb.append('\\'); i += 2 }
+					'/' -> { sb.append('/'); i += 2 }
+					'u' -> {
+						if (i + 5 < s.length) {
+							val code = s.substring(i + 2, i + 6).toIntOrNull(16)
+							if (code != null) {
+								sb.append(code.toChar())
+								i += 6
+							} else {
+								sb.append(c); i++
+							}
+						} else {
+							sb.append(c); i++
+						}
+					}
+					else -> { sb.append(c); i++ }
+				}
+			} else {
+				sb.append(c); i++
+			}
+		}
+		return sb.toString()
+	}
+
 	private fun extractString(json: String, key: String): String? =
-		Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1)
+		unescapeJson(Regex("\"$key\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: return null)
 
 	private fun extractInt(json: String, key: String): Int? =
 		Regex("\"$key\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toIntOrNull()
