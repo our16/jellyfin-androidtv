@@ -43,6 +43,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.data.repository.AppUpdateRepository
 import org.jellyfin.androidtv.ui.base.Text
@@ -189,9 +191,10 @@ fun SettingsAppUpdateScreen() {
 			}
 		}
 
-		// Install confirmation overlay: single confirm button, warns that the app will close
+		// Install confirmation DIALOG: a separate window, centered on the whole screen
+		// (an in-place overlay would only center within the settings content column)
 		if (showInstallConfirm && downloadedApk != null) {
-			InstallConfirmOverlay(
+			InstallConfirmDialog(
 				newVersion = updateInfo?.appVersion ?: "",
 				sizeBytes = updateInfo?.downloadSize ?: 0,
 				onConfirm = {
@@ -204,26 +207,31 @@ fun SettingsAppUpdateScreen() {
 
 		// Installing status: shown instead of any action buttons (the app may be killed)
 		if (isInstalling) {
-			Box(
-				modifier = Modifier
-					.fillMaxSize()
-					.background(Color(0x99000000)),
-				contentAlignment = Alignment.Center,
+			Dialog(
+				onDismissRequest = {},
+				properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false),
 			) {
-				Column(
-					horizontalAlignment = Alignment.CenterHorizontally,
-					verticalArrangement = Arrangement.spacedBy(12.dp),
+				Box(
 					modifier = Modifier
-						.background(Color(0xF0222222), RoundedCornerShape(12.dp))
-						.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-						.padding(horizontal = 32.dp, vertical = 24.dp),
+						.fillMaxSize()
+						.background(Color(0x99000000)),
+					contentAlignment = Alignment.Center,
 				) {
-					Text(text = "正在安装 ${updateInfo?.appVersion ?: ""}", color = Color.White, fontSize = 20.sp)
-					Text(
-						text = "应用即将关闭以完成更新\n完成后将自动重启进入新版本",
-						color = Color(0xCCFFFFFF),
-						fontSize = 16.sp,
-					)
+					Column(
+						horizontalAlignment = Alignment.CenterHorizontally,
+						verticalArrangement = Arrangement.spacedBy(12.dp),
+						modifier = Modifier
+							.background(Color(0xF0222222), RoundedCornerShape(12.dp))
+							.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+							.padding(horizontal = 32.dp, vertical = 24.dp),
+					) {
+						Text(text = "正在安装 ${updateInfo?.appVersion ?: ""}", color = Color.White, fontSize = 20.sp)
+						Text(
+							text = "应用即将关闭以完成更新\n完成后将自动重启进入新版本",
+							color = Color(0xCCFFFFFF),
+							fontSize = 16.sp,
+						)
+					}
 				}
 			}
 		}
@@ -231,60 +239,65 @@ fun SettingsAppUpdateScreen() {
 }
 
 @Composable
-private fun InstallConfirmOverlay(
+private fun InstallConfirmDialog(
 	newVersion: String,
 	sizeBytes: Long,
 	onConfirm: () -> Unit,
 	onDismiss: () -> Unit,
 ) {
-	val confirmFocus = remember { FocusRequester() }
-	var confirmFocused by remember { mutableStateOf(false) }
-
-	// Requesting focus immediately after composition races with the window being laid
-	// out and silently fails, leaving focus below the overlay - retry until the button
-	// actually reports focus, otherwise remote OK presses do nothing.
-	LaunchedEffect(Unit) {
-		var attempts = 0
-		while (!confirmFocused && attempts < 30) {
-			runCatching { confirmFocus.requestFocus() }
-			delay(100)
-			attempts++
-		}
-	}
-
-	Box(
-		modifier = Modifier
-			.fillMaxSize()
-			.background(Color(0x99000000)),
-		contentAlignment = Alignment.Center,
+	Dialog(
+		onDismissRequest = onDismiss,
+		properties = DialogProperties(usePlatformDefaultWidth = false),
 	) {
-		Column(
-			horizontalAlignment = Alignment.CenterHorizontally,
-			verticalArrangement = Arrangement.spacedBy(14.dp),
+		val confirmFocus = remember { FocusRequester() }
+		var confirmFocused by remember { mutableStateOf(false) }
+
+		// Requesting focus immediately after composition races with the dialog window
+		// being laid out and silently fails - retry until the button actually reports
+		// focus, otherwise remote OK presses do nothing.
+		LaunchedEffect(Unit) {
+			var attempts = 0
+			while (!confirmFocused && attempts < 30) {
+				runCatching { confirmFocus.requestFocus() }
+				delay(100)
+				attempts++
+			}
+		}
+
+		Box(
 			modifier = Modifier
-				.width(420.dp)
-				.background(Color(0xF0222222), RoundedCornerShape(12.dp))
-				.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-				.padding(horizontal = 28.dp, vertical = 24.dp),
+				.fillMaxSize()
+				.background(Color(0x99000000)),
+			contentAlignment = Alignment.Center,
 		) {
-			Text(text = "确认安装 $newVersion", color = Color.White, fontSize = 20.sp)
-			Text(
-				text = "更新包已就绪（${formatSize(sizeBytes)}）。\n\n安装过程中应用会关闭，完成后将自动重启进入新版本。",
-				color = Color(0xCCFFFFFF),
-				fontSize = 16.sp,
-			)
-			Spacer(modifier = Modifier.height(4.dp))
-			InstallConfirmButton(
-				focusRequester = confirmFocus,
-				focusedReport = { confirmFocused = it },
-				label = "确认安装",
-				onClick = onConfirm,
-			)
-			InstallConfirmButton(
-				focusRequester = null,
-				label = "取消",
-				onClick = onDismiss,
-			)
+			Column(
+				horizontalAlignment = Alignment.CenterHorizontally,
+				verticalArrangement = Arrangement.spacedBy(14.dp),
+				modifier = Modifier
+					.width(420.dp)
+					.background(Color(0xF0222222), RoundedCornerShape(12.dp))
+					.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+					.padding(horizontal = 28.dp, vertical = 24.dp),
+			) {
+				Text(text = "确认安装 $newVersion", color = Color.White, fontSize = 20.sp)
+				Text(
+					text = "更新包已就绪（${formatSize(sizeBytes)}）。\n\n安装过程中应用会关闭，完成后将自动重启进入新版本。",
+					color = Color(0xCCFFFFFF),
+					fontSize = 16.sp,
+				)
+				Spacer(modifier = Modifier.height(4.dp))
+				InstallConfirmButton(
+					focusRequester = confirmFocus,
+					focusedReport = { confirmFocused = it },
+					label = "确认安装",
+					onClick = onConfirm,
+				)
+				InstallConfirmButton(
+					focusRequester = null,
+					label = "取消",
+					onClick = onDismiss,
+				)
+			}
 		}
 	}
 }
