@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,11 +46,10 @@ fun SplashScreen() {
 		contentAlignment = Alignment.Center,
 	) {
 		Image(
-			painter = painterResource(R.drawable.app_logo),
+			painter = painterResource(R.drawable.app_logo_large),
 			contentDescription = stringResource(R.string.app_name),
-			modifier = Modifier
-				.width(400.dp)
-				.fillMaxHeight(),
+			modifier = Modifier.width(600.dp),
+			contentScale = ContentScale.Fit,
 		)
 	}
 }
