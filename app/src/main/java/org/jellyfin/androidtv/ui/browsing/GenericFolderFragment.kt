@@ -2,6 +2,8 @@ package org.jellyfin.androidtv.ui.browsing
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
@@ -45,6 +47,17 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 		// Rebuild the page so the row reloads with the new sort order
 		navigationRepository.value.navigate(Destinations.folderBrowser(mFolder), true)
 		return true
+	}
+
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+
+		// Season pages (episode lists) read best in the row-first grid: switch to
+		// the grid browser which reuses the same folder argument (1,2,3,4 across,
+		// vertical scrolling - instead of a single horizontally scrolling row)
+		if (mFolder.type == BaseItemKind.SEASON) {
+			navigationRepository.value.navigate(Destinations.libraryBrowser(mFolder), true)
+		}
 	}
 
 	override fun setupQueries(rowLoader: RowLoader) {
