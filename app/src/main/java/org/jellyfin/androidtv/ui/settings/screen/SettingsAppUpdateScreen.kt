@@ -49,6 +49,7 @@ import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -237,7 +238,19 @@ private fun InstallConfirmOverlay(
 	onDismiss: () -> Unit,
 ) {
 	val confirmFocus = remember { FocusRequester() }
-	LaunchedEffect(Unit) { confirmFocus.requestFocus() }
+	var confirmFocused by remember { mutableStateOf(false) }
+
+	// Requesting focus immediately after composition races with the window being laid
+	// out and silently fails, leaving focus below the overlay - retry until the button
+	// actually reports focus, otherwise remote OK presses do nothing.
+	LaunchedEffect(Unit) {
+		var attempts = 0
+		while (!confirmFocused && attempts < 30) {
+			runCatching { confirmFocus.requestFocus() }
+			delay(100)
+			attempts++
+		}
+	}
 
 	Box(
 		modifier = Modifier
@@ -263,6 +276,7 @@ private fun InstallConfirmOverlay(
 			Spacer(modifier = Modifier.height(4.dp))
 			InstallConfirmButton(
 				focusRequester = confirmFocus,
+				focusedReport = { confirmFocused = it },
 				label = "确认安装",
 				onClick = onConfirm,
 			)
@@ -277,7 +291,8 @@ private fun InstallConfirmOverlay(
 
 @Composable
 private fun InstallConfirmButton(
-	focusRequester: androidx.compose.ui.focus.FocusRequester?,
+	focusRequester: FocusRequester?,
+	focusedReport: ((Boolean) -> Unit)? = null,
 	label: String,
 	onClick: () -> Unit,
 ) {
@@ -288,7 +303,10 @@ private fun InstallConfirmButton(
 			if (focused) UpdateAccent else Color(0x22FFFFFF),
 			RoundedCornerShape(8.dp)
 		)
-		.onFocusChanged { focused = it.isFocused }
+		.onFocusChanged {
+			focused = it.isFocused
+			focusedReport?.invoke(it.isFocused)
+		}
 		.focusable()
 		.onKeyEvent { event ->
 			if (event.type == KeyEventType.KeyUp && (event.key == Key.DirectionCenter || event.key == Key.Enter)) {
