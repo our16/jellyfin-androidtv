@@ -82,12 +82,12 @@ class DreamViewModel(
 		.distinctUntilChanged()
 		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
 
-	val content = combine(_mediaContent, _libraryContent) { mediaContent, libraryContent ->
-		mediaContent ?: libraryContent ?: DreamContent.Logo
-	}.stateIn(
+	// The screensaver always shows the Catflix startup artwork (logo): no
+	// media/now-playing rotation anymore
+	val content = flow<DreamContent> { emit(DreamContent.Logo) }.stateIn(
 		scope = viewModelScope,
 		started = SharingStarted.WhileSubscribed(),
-		initialValue = _mediaContent.value ?: _libraryContent.value ?: DreamContent.Logo,
+		initialValue = DreamContent.Logo,
 	)
 
 	private fun getRandomLibraryShowcaseItems(

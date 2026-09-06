@@ -7,8 +7,11 @@ import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.RowPresenter
 
 open class CustomListRowPresenter @JvmOverloads constructor(
-	private val topPadding: Int? = null
-) : ListRowPresenter() {
+	private val topPadding: Int? = null,
+	// Keep the focus zoom subtle: a large zoom made the card overlap its own
+	// title text and neighbouring cards, rendering titles unreadable
+	focusZoomFactor: Int = androidx.leanback.widget.FocusHighlight.ZOOM_FACTOR_SMALL,
+) : ListRowPresenter(focusZoomFactor) {
 	init {
 		headerPresenter = CustomRowHeaderPresenter()
 	}
@@ -23,7 +26,7 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 		// Generous gap between cards inside a row: card titles are always shown
 		// now and need unobstructed space
 		if (holder is ListRowPresenter.ViewHolder) {
-			holder.gridView.setItemSpacing((24 * holder.view.resources.displayMetrics.density).toInt())
+			holder.gridView.setItemSpacing((32 * holder.view.resources.displayMetrics.density).toInt())
 			// Never clip zoomed/focused cards or their title text
 			holder.gridView.setClipChildren(false)
 			holder.gridView.setClipToPadding(false)

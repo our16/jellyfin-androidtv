@@ -153,7 +153,7 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
         view.post(() -> {
             androidx.leanback.widget.VerticalGridView rowsGrid = mRowsFragment.getVerticalGridView();
             if (rowsGrid != null) {
-                rowsGrid.setItemSpacing((int) (24 * getResources().getDisplayMetrics().density));
+                rowsGrid.setItemSpacing((int) (32 * getResources().getDisplayMetrics().density));
             }
         });
 

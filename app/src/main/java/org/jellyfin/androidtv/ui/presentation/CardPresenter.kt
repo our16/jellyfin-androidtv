@@ -493,10 +493,8 @@ private fun CardViewHolderContent(
 	}
 
 	if (usePreview) {
-		val focusModifier = if (focused) Modifier.basicMarquee(
-			iterations = Int.MAX_VALUE,
-			initialDelayMillis = 0,
-		) else Modifier
+		// NOTE: no basicMarquee here - the title wraps to two lines and marquee
+		// only supports single-line text (garbled rendering otherwise)
 
 		ItemPreview(
 			spacing = 8.dp,
@@ -508,8 +506,10 @@ private fun CardViewHolderContent(
 						maxLines = 2,
 						overflow = TextOverflow.Ellipsis,
 						textAlign = TextAlign.Center,
+						fontSize = 14.sp,
+						lineHeight = 17.sp,
 						color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,
-						modifier = Modifier.then(focusModifier),
+						modifier = Modifier,
 					)
 				}
 			},
@@ -520,7 +520,9 @@ private fun CardViewHolderContent(
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
 						textAlign = TextAlign.Center,
-						modifier = Modifier.then(focusModifier),
+						fontSize = 12.sp,
+						color = Tokens.Color.colorGrey300,
+						modifier = Modifier,
 					)
 				}
 			},
