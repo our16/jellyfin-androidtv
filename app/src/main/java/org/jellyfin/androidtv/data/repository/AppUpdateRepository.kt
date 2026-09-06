@@ -304,9 +304,7 @@ class AppUpdateRepositoryImpl(
 	override fun installDownloadedApk(context: Context) {
 		val apk = downloadedApk.value ?: return
 		isInstalling.value = true
-		// The system kills the app during an overwrite install: the user must be told
-		// beforehand to re-open the app afterwards, the SUCCESS broadcast may never arrive
-		downloadMessage.value = "正在安装…应用即将关闭，完成后请重新打开 Catflix"
+		downloadMessage.value = "正在安装…完成后应用将自动重启"
 		launchInstaller(context, apk)
 	}
 
@@ -397,7 +395,7 @@ class AppUpdateRepositoryImpl(
 								}
 							}
 							android.content.pm.PackageInstaller.STATUS_SUCCESS -> {
-								downloadMessage.value = "安装完成，请重新打开应用"
+								downloadMessage.value = "安装完成，正在重启应用…"
 							}
 							else -> {
 								downloadMessage.value = "安装失败 (status=$status)"

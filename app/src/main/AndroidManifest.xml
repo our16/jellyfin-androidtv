@@ -146,5 +146,12 @@
             android:windowSoftInputMode="adjustNothing" />
 
         <activity android:name=".ui.playback.ExternalPlayerActivity" />
-    </application>
+		<receiver
+			android:name=".PackageReplacedReceiver"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+			</intent-filter>
+		</receiver>
+	</application>
 </manifest>

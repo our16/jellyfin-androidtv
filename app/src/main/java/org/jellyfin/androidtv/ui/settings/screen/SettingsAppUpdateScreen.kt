@@ -201,7 +201,7 @@ fun SettingsAppUpdateScreen() {
 				) {
 					Text(text = "正在安装 ${updateInfo?.appVersion ?: ""}", color = Color.White, fontSize = 20.sp)
 					Text(
-						text = "应用即将关闭以完成更新\n安装完成后请重新打开 Catflix",
+						text = "应用即将关闭以完成更新\n完成后将自动重启进入新版本",
 						color = Color(0xCCFFFFFF),
 						fontSize = 16.sp,
 					)
@@ -238,7 +238,7 @@ private fun InstallConfirmOverlay(
 		) {
 			Text(text = "确认安装 $newVersion", color = Color.White, fontSize = 20.sp)
 			Text(
-				text = "更新包已就绪（${formatSize(sizeBytes)}）。\n\n安装过程中应用会关闭，完成后请重新打开 Catflix。",
+				text = "更新包已就绪（${formatSize(sizeBytes)}）。\n\n安装过程中应用会关闭，完成后将自动重启进入新版本。",
 				color = Color(0xCCFFFFFF),
 				fontSize = 16.sp,
 			)
