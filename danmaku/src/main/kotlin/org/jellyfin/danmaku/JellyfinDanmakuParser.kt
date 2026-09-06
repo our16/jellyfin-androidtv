@@ -116,6 +116,9 @@ class JellyfinDanmakuParser : BaseDanmakuParser() {
             if (danmaku != null) {
                 danmaku.text = text
                 danmaku.setTime(time)
+                // Without a timer, BaseDanmaku.isTimeOut() is ALWAYS true (mTimer == null)
+                // and every danmaku gets skipped by the renderer's first gate.
+                danmaku.setTimer(mTimer)
                 // Scale the raw font size by display density so it stays readable on TV screens
                 danmaku.textSize = fontSize * mDispDensity
                 danmaku.textColor = color

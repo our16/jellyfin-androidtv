@@ -259,7 +259,9 @@ public abstract class BaseDanmaku {
     }
 
     public boolean isTimeOut() {
-        return mTimer == null || isTimeOut(mTimer.currMillisecond);
+        // With no timer attached we cannot know the danmaku has expired - treating
+        // it as expired makes isTimeOut() permanently true and skips every danmaku.
+        return mTimer != null && isTimeOut(mTimer.currMillisecond);
     }
 
     public boolean isTimeOut(long ctime) {
@@ -267,7 +269,7 @@ public abstract class BaseDanmaku {
     }
 
     public boolean isOutside() {
-        return mTimer == null || isOutside(mTimer.currMillisecond);
+        return mTimer != null && isOutside(mTimer.currMillisecond);
     }
 
     public boolean isOutside(long ctime) {
