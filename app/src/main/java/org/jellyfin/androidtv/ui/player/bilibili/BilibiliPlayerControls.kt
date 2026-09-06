@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -82,6 +83,7 @@ fun BilibiliPlayerControls(
 	danmakuLoaded: Boolean,
 	danmakuEntries: List<DanmakuListEntry>,
 	danmakuListVisible: Boolean,
+	danmakuListSelectedIndex: Int,
 	hasNext: Boolean,
 	seekHint: String?,
 	danmakuSettingsExpanded: Boolean,
@@ -148,13 +150,11 @@ fun BilibiliPlayerControls(
 		if (danmakuListVisible) {
 			DanmakuListPanel(
 				entries = danmakuEntries,
-				onClose = { onDanmakuListVisibleChange(false) },
-				onInteraction = onInteraction,
+				selectedIndex = danmakuListSelectedIndex,
 				modifier = Modifier
 					.align(Alignment.CenterEnd)
 					.padding(end = 24.dp),
-			)
-		}
+			)		}
 
 		// Central play button while paused: gives focus a clear target so the
 		// progress bar does not swallow OK presses while paused. Shown even when
@@ -513,25 +513,20 @@ private fun SettingRow(
 	}
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun DanmakuListPanel(
 	entries: List<DanmakuListEntry>,
-	onClose: () -> Unit,
-	onInteraction: () -> Unit,
+	selectedIndex: Int,
 	modifier: Modifier = Modifier,
 ) {
-	val focusRequester = remember { FocusRequester() }
+	val listState = rememberLazyListState()
 
-	// Pull focus into the list: the first row's focusRequester may race with the
-	// central play button disappearing or the bottom bar taking focus, so retry
-	// for a short while until the list really owns focus
-	LaunchedEffect(entries.isNotEmpty()) {
+	// Keep the highlighted row visible. The highlight index is owned by the
+	// fragment's key handler - no Compose focus involvement at all, so the
+	// panel can never lose "selection" and keys cannot wander elsewhere.
+	LaunchedEffect(selectedIndex, entries.size) {
 		if (entries.isEmpty()) return@LaunchedEffect
-		repeat(25) {
-			runCatching { focusRequester.requestFocus() }
-			delay(100)
-		}
+		listState.animateScrollToItem(selectedIndex.coerceIn(0, entries.lastIndex))
 	}
 
 	Column(
@@ -540,11 +535,6 @@ private fun DanmakuListPanel(
 			.fillMaxHeight(0.72f)
 			.background(Color(0xE6111111), RoundedCornerShape(12.dp))
 			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
-			.focusGroup()
-			// Focus is trapped inside the panel until Back closes it: any attempt
-			// to move focus outside (left/right to controls, up/down past the ends)
-			// is cancelled, so the remote cannot wander out of the list
-			.focusProperties { exit = { FocusRequester.Cancel } }
 			.padding(10.dp),
 	) {
 		Row(
@@ -555,7 +545,7 @@ private fun DanmakuListPanel(
 		) {
 			Text(text = "弹幕列表 (${entries.size})", color = Color.White, fontSize = 16.sp)
 			Spacer(modifier = Modifier.weight(1f))
-			Text(text = "按返回关闭", color = Color(0x88FFFFFF), fontSize = 12.sp)
+			Text(text = "OK 跳转 · 返回退出", color = Color(0x88FFFFFF), fontSize = 12.sp)
 		}
 
 		if (entries.isEmpty()) {
@@ -566,13 +556,11 @@ private fun DanmakuListPanel(
 				modifier = Modifier.padding(top = 20.dp).align(Alignment.CenterHorizontally),
 			)
 		} else {
-			LazyColumn(modifier = Modifier.fillMaxSize()) {
-				itemsIndexed(entries, key = { _, e -> "${e.timeMs}-${e.text.hashCode()}" }) { _, entry ->
+			LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+				itemsIndexed(entries, key = { _, e -> "${e.timeMs}-${e.text.hashCode()}" }) { index, entry ->
 					DanmakuListRow(
 						entry = entry,
-						onBack = onClose,
-						onInteraction = onInteraction,
-						focusRequester = if (entry === entries.firstOrNull()) focusRequester else null,
+						selected = index == selectedIndex,
 					)
 				}
 			}
@@ -583,31 +571,15 @@ private fun DanmakuListPanel(
 @Composable
 private fun DanmakuListRow(
 	entry: DanmakuListEntry,
-	onBack: () -> Unit,
-	onInteraction: () -> Unit,
-	focusRequester: FocusRequester?,
+	selected: Boolean,
 ) {
-	var focused by remember { mutableStateOf(false) }
-	var modifier = Modifier
-		.fillMaxWidth()
-		.padding(horizontal = 2.dp, vertical = 2.dp)
-		.background(if (focused) Color(0x30FB7299) else Color.Transparent, RoundedCornerShape(8.dp))
-		.then(if (focused) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier)
-		.onFocusChanged { focused = it.isFocused }
-		.focusable()
-		.onKeyEvent { event ->
-			when (event.key) {
-				Key.Back -> {
-					if (event.type == KeyEventType.KeyUp) onBack()
-					true
-				}
-				else -> false
-			}
-		}
-	if (focusRequester != null) modifier = modifier.focusRequester(focusRequester).autoFocus(focusRequester)
-
 	Row(
-		modifier = modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+		modifier = Modifier
+			.fillMaxWidth()
+			.padding(horizontal = 2.dp, vertical = 2.dp)
+			.background(if (selected) Color(0x40FB7299) else Color.Transparent, RoundedCornerShape(8.dp))
+			.then(if (selected) Modifier.border(2.dp, BiliPink, RoundedCornerShape(8.dp)) else Modifier)
+			.padding(horizontal = 8.dp, vertical = 6.dp),
 		verticalAlignment = Alignment.Top,
 	) {
 		Text(
@@ -619,7 +591,7 @@ private fun DanmakuListRow(
 		Column(modifier = Modifier.weight(1f)) {
 			Text(
 				text = entry.text,
-				color = if (focused) Color.White else Color(0xDDFFFFFF),
+				color = if (selected) Color.White else Color(0xDDFFFFFF),
 				fontSize = 14.sp,
 				maxLines = 2,
 				overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

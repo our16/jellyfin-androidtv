@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -108,6 +109,7 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	private var danmakuLoadedState by mutableStateOf(false)
 	private var danmakuEntriesState by mutableStateOf<List<DanmakuListEntry>>(emptyList())
 	private var danmakuListVisible by mutableStateOf(false)
+	private var danmakuListIndex by mutableIntStateOf(0)
 	private var seekHintState by mutableStateOf<String?>(null)
 	private var hasNextState by mutableStateOf(false)
 	private var titleState by mutableStateOf("")
@@ -214,6 +216,7 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				danmakuLoaded = danmakuLoadedState,
 				danmakuEntries = danmakuEntriesState,
 				danmakuListVisible = danmakuListVisible,
+				danmakuListSelectedIndex = danmakuListIndex,
 				hasNext = hasNextState,
 				seekHint = seekHintState,
 				danmakuSettingsExpanded = danmakuSettingsVisible,
@@ -228,8 +231,9 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				onDanmakuListVisibleChange = {
 					danmakuListVisible = it
 					if (it) {
-						// Hide the bottom bar: the list becomes the only focusable
-						// on screen so focus always lands inside it
+						// Start at the top and hide the bottom bar: the list becomes
+						// the only focusable on screen so focus always lands inside it
+						danmakuListIndex = 0
 						hideControls()
 					} else {
 						showControls()
@@ -334,9 +338,46 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 		if (event == null) return false
 		val isDown = event.action == KeyEvent.ACTION_DOWN
 		val isUp = event.action == KeyEvent.ACTION_UP
-		// While the danmaku list panel is open, focus is trapped inside it (focusProperties)
-		// and every key is handled by Compose; Back closes the panel
-		if (controlsVisible || danmakuSettingsVisible || danmakuListVisible) return false
+
+		// While the danmaku list panel is open the fragment owns every key:
+		// up/down move the highlight, OK jumps to the danmaku's timestamp,
+		// Back closes the panel - no dependency on the Compose focus system
+		if (danmakuListVisible) {
+			val entries = danmakuEntriesState
+			when (keyCode) {
+				KeyEvent.KEYCODE_DPAD_UP -> {
+					if (isDown && danmakuListIndex > 0) danmakuListIndex--
+					true
+				}
+				KeyEvent.KEYCODE_DPAD_DOWN -> {
+					if (isDown && danmakuListIndex < entries.lastIndex) danmakuListIndex++
+					true
+				}
+				KeyEvent.KEYCODE_DPAD_CENTER,
+				KeyEvent.KEYCODE_ENTER,
+				-> {
+					if (isUp) {
+						entries.getOrNull(danmakuListIndex)?.let { entry ->
+							danmakuListVisible = false
+							seekTo(entry.timeMs)
+							showControls()
+						}
+					}
+					true
+				}
+				KeyEvent.KEYCODE_BACK -> {
+					if (isUp) {
+						danmakuListVisible = false
+						showControls()
+					}
+					true
+				}
+				else -> true
+			}
+		}
+
+		// While the danmaku settings popup is open, keys are handled by Compose
+		if (controlsVisible || danmakuSettingsVisible) return false
 		return when (keyCode) {
 			KeyEvent.KEYCODE_DPAD_LEFT,
 			KeyEvent.KEYCODE_MEDIA_REWIND,
