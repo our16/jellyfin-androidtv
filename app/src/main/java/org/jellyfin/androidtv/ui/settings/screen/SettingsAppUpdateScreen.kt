@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.settings.screen
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -29,6 +31,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -49,6 +55,39 @@ import org.koin.compose.koinInject
 private val UpdateAccent = Color(0xFF00A4DC)
 
 @Composable
+private fun DownloadProgressRing(progress: Float, modifier: Modifier = Modifier) {
+	Box(modifier = modifier.size(140.dp), contentAlignment = Alignment.Center) {
+		Canvas(modifier = Modifier.fillMaxSize()) {
+			val stroke = 10.dp.toPx()
+			val inset = stroke / 2
+			drawArc(
+				color = Color(0x33FFFFFF),
+				startAngle = 0f,
+				sweepAngle = 360f,
+				useCenter = false,
+				topLeft = Offset(inset, inset),
+				size = Size(size.width - stroke, size.height - stroke),
+				style = Stroke(width = stroke, cap = StrokeCap.Round),
+			)
+			drawArc(
+				color = UpdateAccent,
+				startAngle = -90f,
+				sweepAngle = 360f * progress.coerceIn(0f, 1f),
+				useCenter = false,
+				topLeft = Offset(inset, inset),
+				size = Size(size.width - stroke, size.height - stroke),
+				style = Stroke(width = stroke, cap = StrokeCap.Round),
+			)
+		}
+		Text(
+			text = "${(progress * 100).toInt()}%",
+			color = Color.White,
+			fontSize = 28.sp,
+		)
+	}
+}
+
+@Composable
 fun SettingsAppUpdateScreen() {
 	val context = LocalContext.current
 	val updateRepository = koinInject<AppUpdateRepository>()
@@ -62,6 +101,11 @@ fun SettingsAppUpdateScreen() {
 	val isInstalling by updateRepository.isInstalling.collectAsState()
 
 	var showInstallConfirm by remember { mutableStateOf(false) }
+
+	// Download finished -> pop the confirm dialog automatically (single confirmation step)
+	LaunchedEffect(downloadedApk) {
+		if (downloadedApk != null) showInstallConfirm = true
+	}
 
 	Box(modifier = Modifier.fillMaxSize()) {
 		SettingsColumn {
@@ -129,43 +173,17 @@ fun SettingsAppUpdateScreen() {
 				}
 			}
 
-			// Download progress with a visual bar
+			// Download progress: ring with percentage in the center
 			if (downloadProgress >= 0) {
-				item {
-					ListSection(
-						headingContent = { Text("下载进度") },
-						captionContent = { Text("$downloadProgress%") },
-					)
-				}
 				item {
 					Box(
 						modifier = Modifier
 							.fillMaxWidth()
-							.padding(horizontal = 8.dp)
-							.height(8.dp)
-							.background(Color(0x33FFFFFF))
+							.padding(vertical = 16.dp),
+						contentAlignment = Alignment.Center,
 					) {
-						Box(
-							modifier = Modifier
-								.fillMaxWidth(downloadProgress / 100f)
-								.fillMaxHeight()
-								.background(UpdateAccent)
-						)
+						DownloadProgressRing(progress = downloadProgress / 100f)
 					}
-				}
-			}
-
-			// Download finished: wait for explicit user confirmation to install
-			if (downloadedApk != null && !isInstalling) {
-				item {
-					ListButton(
-						headingContent = { Text("开始安装") },
-						captionContent = {
-							Text("版本 ${updateInfo?.appVersion ?: ""}  安装过程中应用会关闭")
-						},
-						onClick = { showInstallConfirm = true },
-						modifier = Modifier.fillMaxWidth()
-					)
 				}
 			}
 		}

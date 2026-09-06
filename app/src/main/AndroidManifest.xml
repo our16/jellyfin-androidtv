@@ -153,5 +153,12 @@
 				<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
 			</intent-filter>
 		</receiver>
+		<receiver
+			android:name=".InstallStatusReceiver"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="org.jellyfin.androidtv.action.INSTALL_STATUS" />
+			</intent-filter>
+		</receiver>
 	</application>
 </manifest>
