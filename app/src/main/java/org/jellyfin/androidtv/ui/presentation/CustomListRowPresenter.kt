@@ -10,7 +10,7 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 	private val topPadding: Int? = null,
 	// Keep the focus zoom subtle: a large zoom made the card overlap its own
 	// title text and neighbouring cards, rendering titles unreadable
-	focusZoomFactor: Int = androidx.leanback.widget.FocusHighlight.ZOOM_FACTOR_SMALL,
+	focusZoomFactor: Int = androidx.leanback.widget.FocusHighlight.ZOOM_FACTOR_NONE,
 ) : ListRowPresenter(focusZoomFactor) {
 	init {
 		headerPresenter = CustomRowHeaderPresenter()

@@ -154,7 +154,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         // Always use the vertical scrolling grid: it fills ROW-FIRST (1,2,3,4 across
         // then wraps to the next row). The horizontal grid fills COLUMN-FIRST which
         // reads as 1,4,7 / 2,5,8 / 3,6,9 - confusing for browsing.
-        setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_LARGE, false));
+        setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false));
 
         sortOptions = new HashMap<>();
         {
@@ -578,7 +578,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
             // Always keep the vertical scrolling grid (row-first filling) - see note in onCreate
             if (mGridPresenter == null || !(mGridPresenter instanceof VerticalGridPresenter)) {
-                setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_LARGE, false));
+                setGridPresenter(new VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false));
             }
             setDefaultGridRowCols(mPosterSizeSetting, mImageType);
             setAutoCardGridValues();
