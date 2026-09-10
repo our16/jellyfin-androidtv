@@ -231,7 +231,10 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             mGridView.setPadding(titleMargin.getMarginStart(), mGridPaddingTop, clockMargin.getMarginEnd(), mGridPaddingTop); // prevent initial card cutoffs
         } else if (mGridViewHolder instanceof VerticalGridPresenter.ViewHolder) {
             mGridView = ((VerticalGridPresenter.ViewHolder) mGridViewHolder).getGridView();
-            mGridView.setGravity(Gravity.CENTER_HORIZONTAL);
+            // Fill left-to-right starting at the top-left corner: items align to
+            // the start edge instead of centering in the row
+            mGridView.setGravity(Gravity.START | Gravity.TOP);
+            mGridView.setWindowAlignment(androidx.leanback.widget.BaseGridView.WINDOW_ALIGN_BOTH_EDGE);
             mGridView.setPadding(mGridPaddingLeft, mGridPaddingTop, mGridPaddingLeft, mGridPaddingTop); // prevent initial card cutoffs
         }
         mGridView.setHorizontalSpacing(mGridItemSpacingHorizontal);
