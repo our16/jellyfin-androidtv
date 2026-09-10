@@ -196,10 +196,17 @@ public class ItemLauncher {
                         @Override
                         public void onResponse(List<BaseItemDto> response) {
                             if (!isActive()) return;
-                            // Resume the clicked episode from its saved position
-                            long positionTicks = episodeItem.getUserData() != null ? episodeItem.getUserData().getPlaybackPositionTicks() : 0;
+                            // Resume the clicked episode from its saved position.
+                            // Prefer the server-refreshed item from the response (it
+                            // carries the latest UserData); fall back to the list item.
+                            long positionTicks = 0;
+                            if (!response.isEmpty() && response.get(0).getUserData() != null) {
+                                positionTicks = response.get(0).getUserData().getPlaybackPositionTicks();
+                            } else if (episodeItem.getUserData() != null) {
+                                positionTicks = episodeItem.getUserData().getPlaybackPositionTicks();
+                            }
                             int startPos = (int) (positionTicks / 10000);
-                            if (startPos > 0) startPos = Math.max(0, startPos - 30000);
+                            if (startPos > 0) startPos = Math.max(0, startPos - 30000); // 30s resume preroll
                             playbackLauncher.getValue().launch(context, response, startPos, false, 0);
                         }
                     });

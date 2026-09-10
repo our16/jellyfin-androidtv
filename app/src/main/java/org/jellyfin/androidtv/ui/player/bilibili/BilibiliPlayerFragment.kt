@@ -361,9 +361,13 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 				-> {
 					if (isUp) {
 						entries.getOrNull(danmakuListIndex)?.let { entry ->
-							danmakuListVisible = false
 							seekTo(entry.timeMs)
-							showControls()
+							// Keep the list open and re-anchor at the new position
+							// (Back is what closes the list)
+							val newPos = entry.timeMs
+							danmakuListIndex = entries.indexOfFirst { e -> e.timeMs >= newPos }
+								.takeIf { idx -> idx >= 0 }
+								?: (entries.size - 1).coerceAtLeast(0)
 						}
 					}
 					true
@@ -379,21 +383,34 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 			}
 		}
 
-		// While the danmaku settings popup is open, keys are handled by Compose
-		if (controlsVisible || danmakuSettingsVisible) return false
-		return when (keyCode) {
+		// LEFT/RIGHT: the first press (bar hidden) just reveals the control bar;
+		// with the bar visible every press seeks directly using the ladder
+		when (keyCode) {
 			KeyEvent.KEYCODE_DPAD_LEFT,
 			KeyEvent.KEYCODE_MEDIA_REWIND,
 			KeyEvent.KEYCODE_BUTTON_L1 -> {
-				if (isDown) seekBy(-userSettingPreferences[UserSettingPreferences.skipBackLength].toLong())
-				true
+				if (!controlsVisible) {
+					if (isUp) showControls()
+					return true
+				}
+				if (isDown) seekBy(-seekComboStep(-1))
+				return true
 			}
 			KeyEvent.KEYCODE_DPAD_RIGHT,
 			KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
 			KeyEvent.KEYCODE_BUTTON_R1 -> {
-				if (isDown) seekBy(userSettingPreferences[UserSettingPreferences.skipForwardLength].toLong())
-				true
+				if (!controlsVisible) {
+					if (isUp) showControls()
+					return true
+				}
+				if (isDown) seekBy(seekComboStep(1))
+				return true
 			}
+		}
+
+		// While the danmaku settings popup is open, keys are handled by Compose
+		if (controlsVisible || danmakuSettingsVisible) return false
+		return when (keyCode) {
 			KeyEvent.KEYCODE_DPAD_CENTER,
 			KeyEvent.KEYCODE_ENTER,
 			KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
@@ -506,6 +523,25 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 
 	// Seek: never pauses playback; rebuilds the stream when the current one is not seekable
 
+	// Progressive seek: consecutive same-direction skips grow 10s -> 30s -> 60s ->
+	// 2min -> 5min; switching direction or pausing for 2.5s resets the ladder
+	private var seekComboDir = 0
+	private var seekComboCount = 0
+	private var seekComboLastAt = 0L
+
+	private fun seekComboStep(direction: Int): Long {
+		val now = android.os.SystemClock.uptimeMillis()
+		if (direction != seekComboDir || now - seekComboLastAt > 2500) {
+			seekComboDir = direction
+			seekComboCount = 0
+		}
+		seekComboLastAt = now
+		val ladder = longArrayOf(10, 30, 60, 120, 300)
+		val step = ladder[seekComboCount.coerceIn(0, ladder.lastIndex)]
+		seekComboCount++
+		return step * 1000
+	}
+
 	private fun seekBy(deltaMs: Long) {
 		val p = player ?: return
 		val base = if (seekTargetMs >= 0) seekTargetMs else p.currentPosition
@@ -579,6 +615,9 @@ class BilibiliPlayerFragment : Fragment(), View.OnKeyListener {
 	}
 
 	private fun hideControls() {
+		// Defensive: while the settings popup or danmaku list is open the controls
+		// must never hide on their own - closing happens via Back only
+		if (danmakuSettingsVisible || danmakuListVisible) return
 		controlsVisible = false
 		hideControlsRunnable?.let { handler.removeCallbacks(it) }
 	}

@@ -404,28 +404,9 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     }
 
     private void setDefaultGridRowCols(PosterSize posterSize, ImageType imageType) {
+        // Fixed 4 columns per row for all image types and poster sizes
         if (mGridPresenter instanceof VerticalGridPresenter) {
-            int numCols;
-            switch (posterSize) {
-                case SMALLEST:
-                    numCols = imageType.equals(ImageType.BANNER) ? 6 : imageType.equals(ImageType.THUMB) ? 4 : 15;
-                    break;
-                case SMALL:
-                    numCols = imageType.equals(ImageType.BANNER) ? 5 : imageType.equals(ImageType.THUMB) ? 4 : 13;
-                    break;
-                case MED:
-                    numCols = imageType.equals(ImageType.BANNER) ? 4 : imageType.equals(ImageType.THUMB) ? 4 : 11;
-                    break;
-                case LARGE:
-                    numCols = imageType.equals(ImageType.BANNER) ? 3 : imageType.equals(ImageType.THUMB) ? 4 : 7;
-                    break;
-                case X_LARGE:
-                    numCols = imageType.equals(ImageType.BANNER) ? 2 : imageType.equals(ImageType.THUMB) ? 4 : 5;
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + mPosterSizeSetting);
-            }
-            ((VerticalGridPresenter) mGridPresenter).setNumberOfColumns(numCols);
+            ((VerticalGridPresenter) mGridPresenter).setNumberOfColumns(4);
         } else if (mGridPresenter instanceof HorizontalGridPresenter) {
             int numRows;
             switch (posterSize) {
@@ -539,10 +520,22 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
         Timber.d("numCardsScreen <%s>", numCardsScreen);
 
+        // Cap the card height: with 4 columns the auto size makes POSTER cards
+        // ~360dp tall which floods the whole screen. cardHeightInt is in dp.
+        // Match the home screen library cards (126dp, see HomeFragmentViewsRow).
+        cardHeightInt = Math.min(cardHeightInt, 126);
         if (mCardHeight != cardHeightInt) {
             mDirty = true;
         }
         mCardHeight = cardHeightInt;
+
+        // Fixed, even spacing so the 4 columns distribute uniformly across the row
+        int densityAdj24 = (int) (24 * getResources().getDisplayMetrics().density);
+        int densityAdj16 = (int) (16 * getResources().getDisplayMetrics().density);
+        mGridItemSpacingHorizontal = densityAdj24;
+        mGridItemSpacingVertical = densityAdj24;
+        mGridPaddingLeft = densityAdj24;
+        mGridPaddingTop = densityAdj16;
         mGridItemSpacingHorizontal = spacingHorizontalInt;
         mGridItemSpacingVertical = spacingVerticalInt;
         mGridPaddingLeft = paddingLeftInt;

@@ -11,3 +11,5 @@ captures/
 # Signing keys - never commit
 keystore/
 *.hprofhs_err_pid*.log
+hs_err_pid*.log
+java_pid*.hprof

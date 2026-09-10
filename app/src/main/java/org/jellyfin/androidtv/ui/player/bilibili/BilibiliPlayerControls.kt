@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +44,15 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -55,7 +62,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.modifier.autoFocus
@@ -124,28 +134,6 @@ fun BilibiliPlayerControls(
 			)
 		}
 
-		// Danmaku settings popup lives on the root overlay (NOT inside the bottom bar row):
-		// a menu nested in the gear button's Box would inflate the Box and shift neighbouring buttons
-		if (danmakuSettingsExpanded) {
-			DanmakuSettingsPopup(
-				danmakuVisible = danmakuVisible,
-				danmakuLoaded = danmakuLoaded,
-				textSizeIdx = textSizeIdx,
-				speedIdx = speedIdx,
-				opacityIdx = opacityIdx,
-				areaIdx = areaIdx,
-				onCycle = onCycleDanmakuSetting,
-				onToggleDanmaku = onToggleDanmaku,
-				onOpenList = {
-					onDanmakuSettingsExpandedChange(false)
-					onDanmakuListVisibleChange(true)
-				},
-				onInteraction = onInteraction,
-				onDismiss = { onDanmakuSettingsExpandedChange(false) },
-				modifier = Modifier.align(Alignment.BottomEnd),
-			)
-		}
-
 		// Danmaku list side panel (right side of the screen)
 		if (danmakuListVisible) {
 			DanmakuListPanel(
@@ -196,6 +184,7 @@ fun BilibiliPlayerControls(
 				bufferedMs = bufferedMs,
 				hasNext = hasNext,
 				danmakuSettingsExpanded = danmakuSettingsExpanded,
+				danmakuListVisible = danmakuListVisible,
 				textSizeIdx = textSizeIdx,
 				speedIdx = speedIdx,
 				opacityIdx = opacityIdx,
@@ -210,6 +199,31 @@ fun BilibiliPlayerControls(
 				onPlayNext = onPlayNext,
 			)
 		}
+
+		// Settings popup anchored at the bottom-right, right above the gear button.
+		// Lives on the root overlay (NOT inside the bottom bar) so it can never
+		// inflate the bar's layout and push the progress bar around.
+		if (danmakuSettingsExpanded) {
+			DanmakuSettingsPopup(
+				danmakuVisible = danmakuVisible,
+				danmakuLoaded = danmakuLoaded,
+				textSizeIdx = textSizeIdx,
+				speedIdx = speedIdx,
+				opacityIdx = opacityIdx,
+				areaIdx = areaIdx,
+				onCycle = onCycleDanmakuSetting,
+				onToggleDanmaku = onToggleDanmaku,
+				onOpenList = {
+					onDanmakuSettingsExpandedChange(false)
+					onDanmakuListVisibleChange(true)
+				},
+				onInteraction = onInteraction,
+				onDismiss = { onDanmakuSettingsExpandedChange(false) },
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.offset(x = (-16).dp, y = (-112).dp),
+			)
+		}
 	}
 }
 
@@ -222,6 +236,7 @@ val danmakuOpacities = intArrayOf(30, 50, 70, 85, 100)
 val danmakuAreas = floatArrayOf(0.35f, 0.5f, 0.75f, 1.0f)
 val danmakuAreaLabels = arrayOf("1/3屏", "半屏", "3/4屏", "全屏")
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun BottomBar(
 	isPlaying: Boolean,
@@ -230,6 +245,7 @@ private fun BottomBar(
 	bufferedMs: Long,
 	hasNext: Boolean,
 	danmakuSettingsExpanded: Boolean,
+	danmakuListVisible: Boolean,
 	textSizeIdx: Int,
 	speedIdx: Int,
 	opacityIdx: Int,
@@ -244,60 +260,93 @@ private fun BottomBar(
 	onPlayNext: () -> Unit,
 ) {
 	val focusRequester = remember { FocusRequester() }
-	var previewMs by remember { mutableLongStateOf(-1L) }
+	val scope = rememberCoroutineScope()
 
-	LaunchedEffect(previewMs) {
-		if (previewMs >= 0) {
-			delay(700)
+	// Scrub preview: LEFT/RIGHT move a preview marker immediately (with the
+	// progressive ladder), but the actual seek fires only after a short pause -
+	// this debounces transcode restarts while the user is still pressing
+	var previewMs by remember { mutableLongStateOf(-1L) }
+	var scrubComboDir by remember { mutableIntStateOf(0) }
+	var scrubComboCount by remember { mutableIntStateOf(0) }
+	var scrubComboLastAt by remember { mutableLongStateOf(0L) }
+	var scrubJob by remember { mutableStateOf< kotlinx.coroutines.Job?>(null) }
+
+	fun scrubStep(direction: Int): Long {
+		val now = android.os.SystemClock.uptimeMillis()
+		if (direction != scrubComboDir || now - scrubComboLastAt > 2500) {
+			scrubComboDir = direction
+			scrubComboCount = 0
+		}
+		scrubComboLastAt = now
+		val ladder = longArrayOf(10, 30, 60, 120, 300)
+		val step = ladder[scrubComboCount.coerceIn(0, ladder.lastIndex)]
+		scrubComboCount++
+		return step * 1000
+	}
+
+	fun scrubTo(target: Long) {
+		previewMs = target
+		scrubJob?.cancel()
+		scrubJob = scope.launch {
+			delay(550)
 			onSeekTo(previewMs)
 			previewMs = -1
 		}
 	}
 
-	// Only claim focus while playing: when paused the central play button is the
-	// focus anchor and must keep it until playback resumes
-	LaunchedEffect(isPlaying) {
-		if (isPlaying) focusRequester.requestFocus()
+	// Focus watchdog: while PLAYING, if focus ever falls outside the bottom bar
+	// (repeated DOWN can push it into no-focus limbo where keys stop working),
+	// pull it back to the progress bar. While paused the central play button is
+	// the anchor and is left alone.
+	var barHasFocus by remember { mutableStateOf(false) }
+	LaunchedEffect(barHasFocus, isPlaying, danmakuSettingsExpanded, danmakuListVisible) {
+		while (isPlaying && !barHasFocus && !danmakuSettingsExpanded && !danmakuListVisible) {
+			timber.log.Timber.d("BarFocus: watchdog requesting focus")
+			runCatching { focusRequester.requestFocus() }
+			delay(150)
+		}
+		timber.log.Timber.d("BarFocus: watchdog satisfied (bar has focus)")
 	}
 
 	val displayPos = if (previewMs >= 0) previewMs else positionMs
+	var barFocused by remember { mutableStateOf(false) }
 
 	Column(
 		modifier = Modifier
 			.fillMaxWidth()
 			.background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-			.padding(horizontal = 32.dp, vertical = 8.dp),
+			.padding(horizontal = 32.dp, vertical = 8.dp)
+			.onFocusChanged { barHasFocus = it.hasFocus }
+			.focusProperties {
+				// While the settings popup or danmaku list is open the bottom bar
+				// must not receive focus from direction navigation
+				enter = {
+					if (danmakuSettingsExpanded || danmakuListVisible) FocusRequester.Cancel else FocusRequester.Default
+				}
+			},
 	) {
 		Box(
 			modifier = Modifier
 				.fillMaxWidth()
 				.height(32.dp)
-				.focusRequester(focusRequester)
-				.focusable()
-				.onKeyEvent { event ->
+			.onFocusChanged { barFocused = it.isFocused }
+			.focusRequester(focusRequester)
+			.focusable()
+			.onKeyEvent { event ->
 					when (event.key) {
+						// LEFT/RIGHT scrub with preview + debounced seek (the seek
+						// fires on its own after a pause; OK must never seek - it
+						// bubbles up and toggles pause like everywhere else)
 						Key.DirectionLeft -> {
-							// trigger on KeyDown (incl. long-press repeats), ignore the matching KeyUp
 							if (event.type == KeyEventType.KeyDown && durationMs > 0) {
-								previewMs = ((if (previewMs < 0) positionMs else previewMs) - 10_000L)
-									.coerceIn(0L, durationMs)
+								scrubTo(((if (previewMs < 0) positionMs else previewMs) - scrubStep(-1)).coerceIn(0L, durationMs))
 								onInteraction()
 							}
 							true
 						}
 						Key.DirectionRight -> {
 							if (event.type == KeyEventType.KeyDown && durationMs > 0) {
-								previewMs = ((if (previewMs < 0) positionMs else previewMs) + 10_000L)
-									.coerceIn(0L, durationMs)
-								onInteraction()
-							}
-							true
-						}
-						Key.DirectionCenter, Key.Enter -> {
-							// trigger on KeyUp only, otherwise one press fires the action twice
-							if (event.type == KeyEventType.KeyUp && previewMs >= 0) {
-								onSeekTo(previewMs)
-								previewMs = -1
+								scrubTo(((if (previewMs < 0) positionMs else previewMs) + scrubStep(1)).coerceIn(0L, durationMs))
 								onInteraction()
 							}
 							true
@@ -335,14 +384,24 @@ private fun BottomBar(
 						.height(6.dp)
 						.background(BiliPink, RoundedCornerShape(3.dp))
 				)
-				Box(
-					modifier = Modifier
-						.align(Alignment.CenterStart)
-						.absoluteOffset(x = maxWidth * fraction - 3.dp)
-						.width(6.dp)
-						.height(22.dp)
-						.background(Color.White, RoundedCornerShape(3.dp))
-				)
+				// Seek thumb: plain white bar normally; when the bar has focus it
+				// turns into a highlighted cat head so the focus point is obvious
+				if (barFocused) {
+					CatSeekThumb(
+						modifier = Modifier
+							.align(Alignment.CenterStart)
+							.absoluteOffset(x = maxWidth * fraction - 19.dp)
+					)
+				} else {
+					Box(
+						modifier = Modifier
+							.align(Alignment.CenterStart)
+							.absoluteOffset(x = maxWidth * fraction - 3.dp)
+							.width(6.dp)
+							.height(22.dp)
+							.background(Color.White, RoundedCornerShape(3.dp))
+					)
+				}
 			}
 		}
 
@@ -393,6 +452,7 @@ private fun BottomBar(
 	}
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun DanmakuSettingsPopup(
 	danmakuVisible: Boolean,
@@ -409,15 +469,26 @@ private fun DanmakuSettingsPopup(
 	modifier: Modifier = Modifier,
 ) {
 	val focusRequester = remember { FocusRequester() }
-	LaunchedEffect(Unit) { focusRequester.requestFocus() }
+	var popupHasFocus by remember { mutableStateOf(false) }
+
+	// Pull focus into the popup and KEEP retrying until it actually lands there:
+	// during video buffering recomposition can steal/drop the request, and the
+	// focus must never be left uncontrolled outside the popup
+	LaunchedEffect(popupHasFocus) {
+		while (!popupHasFocus) {
+			runCatching { focusRequester.requestFocus() }
+			delay(100)
+		}
+	}
 
 	Column(
 		modifier = modifier
-			.offset(x = (-24).dp, y = -216.dp)
 			.width(230.dp)
 			.background(Color(0xF0222222), RoundedCornerShape(10.dp))
 			.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+			.onFocusChanged { popupHasFocus = it.hasFocus }
 			.focusGroup()
+			.focusProperties { exit = { FocusRequester.Cancel } }
 			.padding(vertical = 6.dp),
 	) {
 		// Danmaku on/off toggle (moved here from the bottom bar)
@@ -643,6 +714,88 @@ private fun CentralPlayButton(
 			colorFilter = ColorFilter.tint(Color.White),
 			contentScale = ContentScale.Fit,
 			modifier = Modifier.size(44.dp),
+		)
+	}
+}
+
+/**
+ * Kawaii cat head used as the seek thumb while the progress bar holds focus:
+ * pink round face, pointed ears, blush cheeks, big eyes and a tiny smile.
+ */
+@Composable
+private fun CatSeekThumb(modifier: Modifier = Modifier) {
+	Canvas(modifier = modifier.size(38.dp)) {
+		val w = size.width
+		val h = size.height
+		val faceColor = BiliPink
+		val faceCenter = Offset(w * 0.5f, h * 0.58f)
+		val faceRadius = w * 0.30f
+
+		// ears (behind the face): triangles with rounded look via slightly inset tips
+		val earPath = Path().apply {
+			moveTo(w * 0.22f, h * 0.52f)
+			lineTo(w * 0.16f, h * 0.14f)
+			lineTo(w * 0.46f, h * 0.32f)
+			close()
+			moveTo(w * 0.78f, h * 0.52f)
+			lineTo(w * 0.84f, h * 0.14f)
+			lineTo(w * 0.54f, h * 0.32f)
+			close()
+		}
+		drawPath(earPath, faceColor)
+
+		// inner ears (lighter)
+		val innerEar = Color(0x66FFFFFF)
+		drawPath(
+			Path().apply {
+				moveTo(w * 0.26f, h * 0.46f)
+				lineTo(w * 0.23f, h * 0.22f)
+				lineTo(w * 0.40f, h * 0.33f)
+				close()
+			},
+			innerEar,
+		)
+		drawPath(
+			Path().apply {
+				moveTo(w * 0.74f, h * 0.46f)
+				lineTo(w * 0.77f, h * 0.22f)
+				lineTo(w * 0.60f, h * 0.33f)
+				close()
+			},
+			innerEar,
+		)
+
+		// face
+		drawCircle(faceColor, radius = faceRadius, center = faceCenter)
+
+		// eyes (big and shiny, dark with white sparkle)
+		val eyeY = faceCenter.y + h * 0.02f
+		val eyeDx = w * 0.115f
+		drawCircle(Color(0xFF3B2B33), radius = w * 0.055f, center = Offset(faceCenter.x - eyeDx, eyeY))
+		drawCircle(Color(0xFF3B2B33), radius = w * 0.055f, center = Offset(faceCenter.x + eyeDx, eyeY))
+		drawCircle(Color.White, radius = w * 0.020f, center = Offset(faceCenter.x - eyeDx - w * 0.012f, eyeY - w * 0.015f))
+		drawCircle(Color.White, radius = w * 0.020f, center = Offset(faceCenter.x + eyeDx - w * 0.012f, eyeY - w * 0.015f))
+
+		// blush cheeks
+		drawCircle(Color(0x59FFFFFF), radius = w * 0.055f, center = Offset(faceCenter.x - w * 0.215f, eyeY + h * 0.055f))
+		drawCircle(Color(0x59FFFFFF), radius = w * 0.055f, center = Offset(faceCenter.x + w * 0.215f, eyeY + h * 0.055f))
+
+		// smile: small "w" mouth
+		val mouthY = eyeY + h * 0.10f
+		val stroke = Stroke(width = w * 0.022f, cap = StrokeCap.Round)
+		drawArc(
+			color = Color(0xFF3B2B33),
+			startAngle = 20f, sweepAngle = 140f, useCenter = false,
+			topLeft = Offset(faceCenter.x - w * 0.055f, mouthY - h * 0.035f),
+			size = Size(w * 0.055f, h * 0.05f),
+			style = stroke,
+		)
+		drawArc(
+			color = Color(0xFF3B2B33),
+			startAngle = 20f, sweepAngle = 140f, useCenter = false,
+			topLeft = Offset(faceCenter.x, mouthY - h * 0.035f),
+			size = Size(w * 0.055f, h * 0.05f),
+			style = stroke,
 		)
 	}
 }

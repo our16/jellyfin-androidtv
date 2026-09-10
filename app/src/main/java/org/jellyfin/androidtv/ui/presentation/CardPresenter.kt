@@ -504,39 +504,52 @@ private fun CardViewHolderContent(
 		// NOTE: no basicMarquee here - the title wraps to two lines and marquee
 		// only supports single-line text (garbled rendering otherwise)
 
-		ItemPreview(
-			spacing = 8.dp,
-			card = { card() },
-			title = title?.let { text ->
-				{
-					Text(
-						text = text,
-						maxLines = 2,
-						overflow = TextOverflow.Ellipsis,
-						textAlign = TextAlign.Center,
-						fontSize = 14.sp,
-						lineHeight = 17.sp,
-						color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,
-						modifier = Modifier,
-					)
-				}
-			},
-			subtitle = subtitle?.let { text ->
-				{
-					Text(
-						text = text,
-						maxLines = 1,
-						overflow = TextOverflow.Ellipsis,
-						textAlign = TextAlign.Center,
-						fontSize = 12.sp,
-						color = Tokens.Color.colorGrey300,
-						modifier = Modifier,
-					)
-				}
-			},
-		)
+		// Center the card content: in grid pages the cell is wider than the card
+		// (fixed card height) and the card would otherwise hug the left edge
+		Box(
+			modifier = Modifier.fillMaxSize(),
+			contentAlignment = Alignment.Center,
+		) {
+			ItemPreview(
+				spacing = 8.dp,
+				card = { card() },
+				title = title?.let { text ->
+					{
+						Text(
+							text = text,
+							maxLines = 2,
+							overflow = TextOverflow.Ellipsis,
+							textAlign = TextAlign.Center,
+							fontSize = 14.sp,
+							lineHeight = 17.sp,
+							color = if (focused) Tokens.Color.colorWhite else Tokens.Color.colorGrey100,
+							modifier = Modifier,
+						)
+					}
+				},
+				subtitle = subtitle?.let { text ->
+					{
+						Text(
+							text = text,
+							maxLines = 1,
+							overflow = TextOverflow.Ellipsis,
+							textAlign = TextAlign.Center,
+							fontSize = 12.sp,
+							color = Tokens.Color.colorGrey300,
+							modifier = Modifier,
+						)
+					}
+				},
+			)
+		}
 	} else {
-		card()
+		// Same centering for the plain card in grid cells wider than the card
+		Box(
+			modifier = Modifier.fillMaxSize(),
+			contentAlignment = Alignment.Center,
+		) {
+			card()
+		}
 	}
 }
 
