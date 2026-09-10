@@ -504,11 +504,12 @@ private fun CardViewHolderContent(
 		// NOTE: no basicMarquee here - the title wraps to two lines and marquee
 		// only supports single-line text (garbled rendering otherwise)
 
-		// Center the card content: in grid pages the cell is wider than the card
-		// (fixed card height) and the card would otherwise hug the left edge
+		// Align the card to the start of its cell: in grid pages the cell is wider
+		// than the card (fixed card height) and centering made rows start from the
+		// middle of the screen instead of filling left-to-right
 		Box(
 			modifier = Modifier.fillMaxSize(),
-			contentAlignment = Alignment.Center,
+			contentAlignment = Alignment.CenterStart,
 		) {
 			ItemPreview(
 				spacing = 8.dp,
@@ -543,10 +544,10 @@ private fun CardViewHolderContent(
 			)
 		}
 	} else {
-		// Same centering for the plain card in grid cells wider than the card
+		// Same start alignment for the plain card in grid cells wider than the card
 		Box(
 			modifier = Modifier.fillMaxSize(),
-			contentAlignment = Alignment.Center,
+			contentAlignment = Alignment.CenterStart,
 		) {
 			card()
 		}

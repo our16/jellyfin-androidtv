@@ -219,7 +219,8 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     }
 
     private void createGrid() {
-        mGridItemSpacingHorizontal = (int) (32 * getResources().getDisplayMetrics().density);
+        int density = (int) getResources().getDisplayMetrics().density;
+        mGridItemSpacingHorizontal = 24 * density;
         mGridItemSpacingVertical = mGridItemSpacingHorizontal;
 
         mGridViewHolder = mGridPresenter.onCreateViewHolder(binding.rowsFragment);
@@ -523,26 +524,32 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
         Timber.d("numCardsScreen <%s>", numCardsScreen);
 
-        // Cap the card height: with 4 columns the auto size makes POSTER cards
-        // ~360dp tall which floods the whole screen. cardHeightInt is in dp.
-        // Match the home screen library cards (126dp, see HomeFragmentViewsRow).
-        cardHeightInt = Math.min(cardHeightInt, 126);
+        // ---- Fixed 4-column layout: row fills left to right, never wider than the screen ----
+        final int numColumns = 4;
+        final int spacingDp = 24;
+        final int paddingDp = 24;
+        final int density = (int) getResources().getDisplayMetrics().density;
+
+        // Largest card height whose width still lets all columns + spacing fit.
+        // Media cards render as 16:9 landscape thumbnails (see CardPresenter), so
+        // size the cap by that ratio - using the poster ratio here made cards
+        // wider than their cell and pushed rows off-centre/off-screen.
+        int availableDp = mGridWidth - (2 * paddingDp) - ((numColumns - 1) * spacingDp);
+        int maxCardWidthDp = Math.max(availableDp / numColumns, 1);
+        int maxCardHeightDp = Math.max((int) Math.round(maxCardWidthDp * 9.0 / 16.0), 1);
+
+        // Match the home screen library cards (126dp) but never exceed the screen width
+        cardHeightInt = Math.min(cardHeightInt, Math.min(126, maxCardHeightDp));
+
         if (mCardHeight != cardHeightInt) {
             mDirty = true;
         }
         mCardHeight = cardHeightInt;
 
-        // Fixed, even spacing so the 4 columns distribute uniformly across the row
-        int densityAdj24 = (int) (24 * getResources().getDisplayMetrics().density);
-        int densityAdj16 = (int) (16 * getResources().getDisplayMetrics().density);
-        mGridItemSpacingHorizontal = densityAdj24;
-        mGridItemSpacingVertical = densityAdj24;
-        mGridPaddingLeft = densityAdj24;
-        mGridPaddingTop = densityAdj16;
-        mGridItemSpacingHorizontal = spacingHorizontalInt;
-        mGridItemSpacingVertical = spacingVerticalInt;
-        mGridPaddingLeft = paddingLeftInt;
-        mGridPaddingTop = paddingTopInt;
+        mGridItemSpacingHorizontal = spacingDp * density;
+        mGridItemSpacingVertical = spacingDp * density;
+        mGridPaddingLeft = paddingDp * density;
+        mGridPaddingTop = 16 * density;
     }
 
     private void setupQueries() {
